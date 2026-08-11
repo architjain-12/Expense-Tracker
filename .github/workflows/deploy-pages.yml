@@ -1,127 +1,61 @@
-# -----------------------------------------------------------------------------
-# PERSONAL FINANCE TRACKER
-# GITHUB PAGES DEPLOYMENT
-# -----------------------------------------------------------------------------
-#
-# Repository structure:
-#
-# Expense-Tracker/
-# └── personal-finance-tracker/
-#     ├── frontend/
-#     ├── google-apps-script/
-#     ├── docs/
-#     └── ...
-#
-# Therefore all frontend paths below intentionally start with:
-#
-#     personal-finance-tracker/frontend
-#
-# -----------------------------------------------------------------------------
-
 name: Deploy Finance Tracker
 
-# -----------------------------------------------------------------------------
-# WORKFLOW TRIGGERS
-# -----------------------------------------------------------------------------
-
 on:
-
-  # Automatically run whenever changes are pushed to main.
   push:
     branches:
       - main
 
-  # Allows manual execution from GitHub Actions.
   workflow_dispatch:
-
-# -----------------------------------------------------------------------------
-# GITHUB PERMISSIONS
-# -----------------------------------------------------------------------------
 
 permissions:
   contents: read
   pages: write
   id-token: write
 
-# -----------------------------------------------------------------------------
-# DEPLOYMENT CONCURRENCY
-# -----------------------------------------------------------------------------
-
 concurrency:
   group: pages
   cancel-in-progress: true
 
-# -----------------------------------------------------------------------------
-# JOBS
-# -----------------------------------------------------------------------------
-
 jobs:
 
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
   # BUILD
-  # ===========================================================================
-
+  # ---------------------------------------------------------------------------
   build:
 
-    # GitHub-hosted Ubuntu machine.
     runs-on: ubuntu-latest
 
     steps:
 
-      # -----------------------------------------------------------------------
-      # STEP 1 - CHECKOUT REPOSITORY
-      # -----------------------------------------------------------------------
-
+      # Checkout the repository.
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # -----------------------------------------------------------------------
-      # STEP 2 - SETUP NODE.JS
-      # -----------------------------------------------------------------------
-
+      # Install Node.js.
+      #
+      # No npm cache is used yet because your repository currently does not
+      # have a package-lock.json.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # -----------------------------------------------------------------------
-      # STEP 3 - INSTALL FRONTEND DEPENDENCIES
-      # -----------------------------------------------------------------------
+      # Install dependencies from the repository ROOT.
       #
-      # IMPORTANT:
-      #
-      # The frontend is NOT at:
-      #
-      #     ./frontend
-      #
-      # It is at:
-      #
-      #     ./personal-finance-tracker/frontend
-      #
-      # -----------------------------------------------------------------------
-
+      # There is intentionally NO working-directory here.
       - name: Install frontend dependencies
-        working-directory: personal-finance-tracker/
         run: npm install --no-audit --no-fund
 
-      # -----------------------------------------------------------------------
-      # STEP 4 - BUILD FRONTEND
-      # -----------------------------------------------------------------------
-
+      # Build the Vite application from the repository ROOT.
       - name: Build frontend
-        working-directory: personal-finance-tracker/
         env:
-
           # GitHub repository name.
           #
           # Example:
+          # Expense-Tracker
           #
-          # Repository = Expense-Tracker
-          #
-          # Vite base path becomes:
-          #
+          # becomes:
           # /Expense-Tracker/
-          #
           VITE_BASE_PATH: /${{ github.event.repository.name }}/
 
           # Google Apps Script Web App URL.
@@ -132,65 +66,36 @@ jobs:
 
         run: npm run build
 
-      # -----------------------------------------------------------------------
-      # STEP 5 - CREATE SPA FALLBACK
-      # -----------------------------------------------------------------------
-      #
-      # React Router needs a fallback when GitHub Pages receives a direct
-      # request for routes such as:
-      #
-      #     /transactions
-      #     /reports
-      #     /manage
-      #
-      # -----------------------------------------------------------------------
-
+      # GitHub Pages needs a fallback for React Router.
       - name: Create GitHub Pages SPA fallback
-        working-directory: personal-finance-tracker/
         run: cp dist/index.html dist/404.html
 
-      # -----------------------------------------------------------------------
-      # STEP 6 - CONFIGURE GITHUB PAGES
-      # -----------------------------------------------------------------------
-
+      # Configure GitHub Pages.
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      # -----------------------------------------------------------------------
-      # STEP 7 - UPLOAD FRONTEND BUILD
-      # -----------------------------------------------------------------------
-
+      # Upload the Vite production build.
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
+          path: dist
 
-          # IMPORTANT:
-          # The Vite production build is here.
-          path: personal-finance-tracker/dist
-
-  # ===========================================================================
+  # ---------------------------------------------------------------------------
   # DEPLOY
-  # ===========================================================================
-
+  # ---------------------------------------------------------------------------
   deploy:
 
-    # Only deploy if the build succeeds.
     needs: build
 
-    # GitHub Pages environment.
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
-    # Ubuntu deployment machine.
     runs-on: ubuntu-latest
 
     steps:
 
-      # -----------------------------------------------------------------------
-      # DEPLOY TO GITHUB PAGES
-      # -----------------------------------------------------------------------
-
+      # Deploy the generated dist/ directory to GitHub Pages.
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
