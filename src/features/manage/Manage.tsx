@@ -10,7 +10,7 @@ import { api } from '../../api/client';
 import { useAccounts, useCategories } from '../categories/useCategories';
 
 const today = () => new Date().toISOString().slice(0, 10);
-const blank = (value = '') => value;
+// const blank = (value = '') => value;
 
 export function Manage() {
   const [tab, setTab] = useState('Categories');

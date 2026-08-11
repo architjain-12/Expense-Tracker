@@ -1,0 +1,125 @@
+# This workflow automatically builds and deploys the React/Vite frontend
+# whenever you push changes to the main branch.
+
+name: Deploy Frontend to GitHub Pages
+
+# ---------------------------------------------------------
+# WHEN SHOULD THIS WORKFLOW RUN?
+# ---------------------------------------------------------
+on:
+  # Run automatically whenever code is pushed to main.
+  push:
+    branches:
+      - main
+
+  # Also allow you to manually start the workflow
+  # from GitHub Actions -> Run workflow.
+  workflow_dispatch:
+
+# ---------------------------------------------------------
+# PERMISSIONS
+# ---------------------------------------------------------
+# GitHub Pages requires these permissions to publish
+# the generated frontend.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Prevent two deployments from running at the same time.
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+
+  # =======================================================
+  # BUILD JOB
+  # =======================================================
+  build:
+
+    # Use GitHub's Ubuntu virtual machine.
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ---------------------------------------------------
+      # STEP 1 - Get the source code
+      # ---------------------------------------------------
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ---------------------------------------------------
+      # STEP 2 - Install Node.js
+      # ---------------------------------------------------
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # ---------------------------------------------------
+      # STEP 3 - Install frontend dependencies
+      # ---------------------------------------------------
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # ---------------------------------------------------
+      # STEP 4 - Build React/Vite application
+      #
+      # These values are read from GitHub repository secrets.
+      #
+      # IMPORTANT:
+      # The values are embedded into the frontend during build.
+      # ---------------------------------------------------
+      - name: Build frontend
+        working-directory: frontend
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_TOKEN: ${{ secrets.VITE_API_TOKEN }}
+        run: npm run build
+
+      # ---------------------------------------------------
+      # STEP 5 - Configure GitHub Pages
+      # ---------------------------------------------------
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      # ---------------------------------------------------
+      # STEP 6 - Upload generated frontend
+      #
+      # Vite normally creates the production files in:
+      #
+      # frontend/dist
+      # ---------------------------------------------------
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: frontend/dist
+
+
+  # =======================================================
+  # DEPLOY JOB
+  # =======================================================
+  deploy:
+
+    # This job depends on the build job.
+    needs: build
+
+    # GitHub Pages environment.
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ---------------------------------------------------
+      # Deploy the generated frontend to GitHub Pages.
+      # ---------------------------------------------------
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
