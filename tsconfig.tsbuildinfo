@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/client.ts","./src/features/categories/usecategories.ts","./src/features/dashboard/dashboard.tsx","./src/features/transactions/addtransactionform.tsx","./src/features/transactions/transactionslist.tsx","./src/types/finance.ts"],"version":"5.9.3"}

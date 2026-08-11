@@ -1,176 +1,77 @@
-import { useMemo, useState } from 'react';
+// -----------------------------------------------------------------------------
+// ADD TRANSACTION
+// -----------------------------------------------------------------------------
+// This form is intentionally compact for mobile. The save button is no longer
+// pushed far down the page: it stays immediately after the required fields.
+
+import { useMemo, useState, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../api/client';
 import { useAccounts, useCategories } from '../categories/useCategories';
-import type { TransactionType } from '../../types/finance';
 
 const schema = z.object({
-  date: z.string().min(1, 'Required'),
-  transactionType: z.enum(['EXPENSE', 'INCOME', 'INVESTMENT']),
-  amount: z.coerce.number().positive('Enter an amount greater than 0'),
-  categoryId: z.string().min(1, 'Pick a category'),
-  subcategoryId: z.string().optional(),
-  accountId: z.string().min(1, 'Pick an account'),
-  merchantName: z.string().optional(),
-  description: z.string().optional(),
-  needWant: z.enum(['NEED', 'WANT']).optional(),
+  date: z.string().min(1), transactionType: z.enum(['EXPENSE', 'INCOME', 'INVESTMENT']),
+  amount: z.coerce.number().positive('Enter an amount greater than 0'), categoryId: z.string().min(1, 'Select a category'),
+  subcategoryId: z.string().optional(), accountId: z.string().min(1, 'Select an account'), merchantName: z.string().optional(),
+  description: z.string().optional(), needWant: z.enum(['NEED', 'WANT']).optional(),
+  essentialDiscretionary: z.enum(['ESSENTIAL', 'DISCRETIONARY']).optional(), fixedVariable: z.enum(['FIXED', 'VARIABLE']).optional(), notes: z.string().optional(),
 });
-
 type FormValues = z.infer<typeof schema>;
-
 const today = () => new Date().toISOString().slice(0, 10);
 
 export function AddTransactionForm() {
   const { data: categories = [] } = useCategories();
   const { data: accounts = [] } = useAccounts();
   const queryClient = useQueryClient();
-  const [justSaved, setJustSaved] = useState<string | null>(null);
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    reset,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({
+  const [message, setMessage] = useState('');
+  const { register, handleSubmit, watch, reset, formState: { errors } } = useForm<FormValues>({
     resolver: zodResolver(schema),
-    defaultValues: {
-      date: today(),
-      transactionType: 'EXPENSE' as TransactionType,
-      accountId: accounts[0]?.accountId ?? '',
-    },
+    defaultValues: { date: today(), transactionType: 'EXPENSE', accountId: '' },
   });
-
-  const selectedCategoryId = watch('categoryId');
-  const subcategories = useMemo(
-    () => categories.find((c) => c.categoryId === selectedCategoryId)?.subcategories ?? [],
-    [categories, selectedCategoryId]
-  );
-
+  const categoryId = watch('categoryId');
+  const subcategories = useMemo(() => categories.find(c => c.categoryId === categoryId)?.subcategories ?? [], [categories, categoryId]);
   const mutation = useMutation({
-    mutationFn: (values: FormValues) =>
-      api.addTransaction({ ...values, currency: 'INR', source: 'WEB' }),
+    mutationFn: (values: FormValues) => api.addTransaction({ ...values, currency: 'INR', source: 'WEB' }),
     onSuccess: (_, values) => {
       queryClient.invalidateQueries({ queryKey: ['transactions'] });
       queryClient.invalidateQueries({ queryKey: ['monthlySummary'] });
-      setJustSaved(`Saved ₹${values.amount.toLocaleString('en-IN')}`);
+      setMessage(`Saved ₹${values.amount.toLocaleString('en-IN')}`);
       reset({ date: today(), transactionType: 'EXPENSE', accountId: values.accountId });
-      setTimeout(() => setJustSaved(null), 2500);
+      setTimeout(() => setMessage(''), 2500);
     },
   });
 
-  const onSubmit = (values: FormValues) => mutation.mutate(values);
-  const type = watch('transactionType');
+  return <form onSubmit={handleSubmit(values => mutation.mutate(values))} className="space-y-3">
+    <div className="grid grid-cols-3 gap-2">
+      {(['EXPENSE', 'INCOME', 'INVESTMENT'] as const).map(type => <label key={type} className="choice">
+        <input type="radio" value={type} className="sr-only" {...register('transactionType')} />
+        {type === 'EXPENSE' ? 'Expense' : type === 'INCOME' ? 'Income' : 'Investment'}
+      </label>)}
+    </div>
 
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5 pb-24">
-      <div className="grid grid-cols-3 gap-2">
-        {(['EXPENSE', 'INCOME', 'INVESTMENT'] as const).map((t) => (
-          <label
-            key={t}
-            className={`flex cursor-pointer items-center justify-center rounded-xl border py-3 text-sm font-medium transition ${
-              type === t
-                ? t === 'EXPENSE'
-                  ? 'border-expense bg-expense/10 text-expense'
-                  : t === 'INCOME'
-                  ? 'border-income bg-income/10 text-income'
-                  : 'border-invest bg-invest/10 text-invest'
-                : 'border-slate-200 text-slate-500'
-            }`}
-          >
-            <input type="radio" value={t} className="sr-only" {...register('transactionType')} />
-            {t === 'EXPENSE' ? 'Expense' : t === 'INCOME' ? 'Income' : 'Investment'}
-          </label>
-        ))}
-      </div>
+    <div className="card compact-grid">
+      <Field label="Amount (₹)" error={errors.amount?.message}><input autoFocus inputMode="decimal" type="number" step="0.01" placeholder="0" {...register('amount')} className="amount-input" /></Field>
+      <Field label="Date"><input type="date" {...register('date')} className="input" /></Field>
+      <Field label="Account" error={errors.accountId?.message}><select {...register('accountId')} className="input"><option value="">Select</option>{accounts.map(a => <option key={a.accountId} value={a.accountId}>{a.displayName}</option>)}</select></Field>
+      <Field label="Category" error={errors.categoryId?.message}><select {...register('categoryId')} className="input"><option value="">Select</option>{categories.map(c => <option key={c.categoryId} value={c.categoryId}>{c.displayName}</option>)}</select></Field>
+      {subcategories.length > 0 && <Field label="Subcategory"><select {...register('subcategoryId')} className="input"><option value="">Select</option>{subcategories.map(s => <option key={s.subcategoryId} value={s.subcategoryId}>{s.displayName}</option>)}</select></Field>}
+      <Field label="Merchant"><input placeholder="e.g. Amazon" {...register('merchantName')} className="input" /></Field>
+      <Field label="Need / Want"><select {...register('needWant')} className="input"><option value="">Select</option><option>NEED</option><option>WANT</option></select></Field>
+      <Field label="Essential / Discretionary"><select {...register('essentialDiscretionary')} className="input"><option value="">Select</option><option>ESSENTIAL</option><option>DISCRETIONARY</option></select></Field>
+      <Field label="Fixed / Variable"><select {...register('fixedVariable')} className="input"><option value="">Select</option><option>FIXED</option><option>VARIABLE</option></select></Field>
+      <Field label="Description"><input {...register('description')} className="input" /></Field>
+      <Field label="Notes"><input {...register('notes')} className="input" /></Field>
+    </div>
 
-      <div>
-        <label className="mb-1 block text-sm text-slate-500">Amount (₹)</label>
-        <input
-          type="number"
-          inputMode="decimal"
-          step="0.01"
-          placeholder="0.00"
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-2xl font-display tabular"
-          {...register('amount')}
-          autoFocus
-        />
-        {errors.amount && <p className="mt-1 text-sm text-expense">{errors.amount.message}</p>}
-      </div>
+    <button disabled={mutation.isPending} className="primary-button">{mutation.isPending ? 'Saving…' : 'Save transaction'}</button>
+    {message && <p className="success">{message}</p>}
+    {mutation.isError && <p className="error">{(mutation.error as Error).message}</p>}
+  </form>;
+}
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className="mb-1 block text-sm text-slate-500">Date</label>
-          <input type="date" className="w-full rounded-xl border border-slate-200 px-3 py-2.5" {...register('date')} />
-        </div>
-        <div>
-          <label className="mb-1 block text-sm text-slate-500">Account</label>
-          <select className="w-full rounded-xl border border-slate-200 px-3 py-2.5" {...register('accountId')}>
-            {accounts.map((a) => (
-              <option key={a.accountId} value={a.accountId}>
-                {a.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm text-slate-500">Category</label>
-        <select className="w-full rounded-xl border border-slate-200 px-3 py-2.5" {...register('categoryId')}>
-          <option value="">Select a category</option>
-          {categories.map((c) => (
-            <option key={c.categoryId} value={c.categoryId}>
-              {c.displayName}
-            </option>
-          ))}
-        </select>
-        {errors.categoryId && <p className="mt-1 text-sm text-expense">{errors.categoryId.message}</p>}
-      </div>
-
-      {subcategories.length > 0 && (
-        <div>
-          <label className="mb-1 block text-sm text-slate-500">Subcategory</label>
-          <select className="w-full rounded-xl border border-slate-200 px-3 py-2.5" {...register('subcategoryId')}>
-            <option value="">Select a subcategory</option>
-            {subcategories.map((s) => (
-              <option key={s.subcategoryId} value={s.subcategoryId}>
-                {s.displayName}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div>
-        <label className="mb-1 block text-sm text-slate-500">Merchant / note (optional)</label>
-        <input
-          type="text"
-          placeholder="e.g. Starbucks"
-          className="w-full rounded-xl border border-slate-200 px-3 py-2.5"
-          {...register('merchantName')}
-        />
-      </div>
-
-      <button
-        type="submit"
-        disabled={isSubmitting || mutation.isPending}
-        className="fixed inset-x-4 bottom-6 rounded-xl bg-ink py-4 text-center font-medium text-paper shadow-lg disabled:opacity-60 sm:static sm:inset-auto"
-      >
-        {mutation.isPending ? 'Saving…' : 'Save transaction'}
-      </button>
-
-      {justSaved && (
-        <p className="fixed inset-x-4 bottom-24 rounded-lg bg-income/10 py-2 text-center text-sm text-income sm:static">
-          {justSaved}
-        </p>
-      )}
-      {mutation.isError && (
-        <p className="text-sm text-expense">{(mutation.error as Error).message}</p>
-      )}
-    </form>
-  );
+function Field({ label, error, children }: { label: string; error?: string; children: ReactNode }) {
+  return <label className="field"><span>{label}</span>{children}{error && <small className="error">{error}</small>}</label>;
 }

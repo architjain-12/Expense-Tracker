@@ -1,53 +1,17 @@
-import { useState } from 'react';
+// Detailed transaction table/list. On mobile it becomes compact cards.
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../api/client';
-import { useCategories } from '../categories/useCategories';
-
-function currentMonthRange() {
-  const now = new Date();
-  const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10);
-  return { from, to };
-}
+import { useCategories, useAccounts } from '../categories/useCategories';
 
 export function TransactionsList() {
-  const [{ from, to }] = useState(currentMonthRange());
   const { data: categories = [] } = useCategories();
-  const { data: transactions = [], isLoading } = useQuery({
-    queryKey: ['transactions', from, to],
-    queryFn: () => api.getTransactions({ from, to, limit: 200 }),
-  });
-
-  const categoryName = (id: string) => categories.find((c) => c.categoryId === id)?.displayName ?? id;
-
-  if (isLoading) return <p className="text-slate-500">Loading…</p>;
-  if (transactions.length === 0) {
-    return <p className="text-slate-500">No transactions this month yet. Add your first one above.</p>;
-  }
-
-  return (
-    <ul className="divide-y divide-slate-100">
-      {transactions.map((t) => (
-        <li key={t.transactionId} className="flex items-center justify-between py-3">
-          <div>
-            <p className="font-medium">{t.merchantName || categoryName(t.categoryId)}</p>
-            <p className="text-sm text-slate-500">
-              {t.date} · {categoryName(t.categoryId)}
-            </p>
-          </div>
-          <p
-            className={`tabular font-display text-lg ${
-              t.transactionType === 'EXPENSE'
-                ? 'text-expense'
-                : t.transactionType === 'INCOME'
-                ? 'text-income'
-                : 'text-invest'
-            }`}
-          >
-            {t.transactionType === 'EXPENSE' ? '−' : '+'}₹{Number(t.amount).toLocaleString('en-IN')}
-          </p>
-        </li>
-      ))}
-    </ul>
-  );
+  const { data: accounts = [] } = useAccounts();
+  const { data: transactions = [], isLoading } = useQuery({ queryKey: ['transactions', 'recent'], queryFn: () => api.getTransactions({ limit: '300' }) });
+  if (isLoading) return <p className="muted">Loading transactions…</p>;
+  const categoryName = (id: string) => categories.find(c => c.categoryId === id)?.displayName ?? id;
+  const accountName = (id: string) => accounts.find(a => a.accountId === id)?.displayName ?? id;
+  if (!transactions.length) return <p className="muted">No transactions yet.</p>;
+  return <div className="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Category</th><th>Merchant</th><th>Account</th><th>Amount</th><th>Notes</th></tr></thead><tbody>
+    {transactions.map(t => <tr key={t.transactionId}><td>{t.date}</td><td>{t.transactionType}</td><td>{categoryName(t.categoryId)}</td><td>{t.merchantName || '—'}</td><td>{accountName(t.accountId)}</td><td className="money">₹{Number(t.amount).toLocaleString('en-IN')}</td><td>{t.notes || t.description || '—'}</td></tr>)}
+  </tbody></table></div>;
 }

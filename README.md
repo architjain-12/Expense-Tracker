@@ -1,41 +1,48 @@
-# Frontend
+# Frontend - beginner guide
 
-React + TypeScript + Vite PWA. Talks directly to the Apps Script backend —
-no server of your own to run.
+## What each folder does
 
-## Local setup
+- `src/main.tsx`: starts React and enables React Query + routing.
+- `src/App.tsx`: navigation and application pages.
+- `src/api/client.ts`: every HTTP call to Apps Script.
+- `src/types/finance.ts`: TypeScript data model matching Sheet columns.
+- `src/features/transactions/`: transaction entry and transaction history.
+- `src/features/dashboard/`: monthly dashboard.
+- `src/features/reports/`: yearly reports and net worth.
+- `src/features/manage/`: budgets, recurring items, subscriptions, goals, investments, assets, liabilities, merchants, categories, accounts and settings.
+- `src/features/categories/useCategories.ts`: loads categories/accounts and caches them.
+- `index.css`: mobile/desktop layout and visual styling.
 
-```bash
-npm install
-cp .env.example .env      # fill in VITE_API_BASE_URL and VITE_API_TOKEN
-npm run dev
-```
+## How to make a small frontend change
 
-Open the printed localhost URL — works on your phone too if you're on the
-same wifi (use your computer's LAN IP instead of localhost).
+1. Find the screen in `src/features/`.
+2. Change the JSX/text/class in that file.
+3. Run `npm run build` locally.
+4. Commit the change.
+5. Push to `main`.
+6. GitHub Actions runs `npm ci`, `npm run build` and deploys the result.
+7. Open the GitHub Pages URL. Because the app is a PWA, refresh once if an older cached version is displayed.
 
-## Deploying free to GitHub Pages
+## How to change categories/accounts
 
-1. Push this `frontend/` folder (or the whole repo) to a GitHub repo.
-2. In `vite.config.ts`, set `REPO_NAME` to your actual repo name.
-3. `npm install` (adds `gh-pages` as a dev dependency, already in package.json).
-4. `npm run deploy` — builds and pushes `dist/` to a `gh-pages` branch.
-5. In the GitHub repo settings → Pages → set source to the `gh-pages` branch.
-6. Your app is now at `https://<your-username>.github.io/<repo-name>/`.
+You no longer need to edit the Sheet manually for normal changes.
 
-Because `.env` is not committed (it's gitignored), your token isn't in the
-repo — but it *is* baked into the built JS bundle that ships to the browser,
-per the security note in `docs/ARCHITECTURE.md`. If you want a private-ish
-URL, keep the exact GitHub Pages URL out of anywhere public.
+1. Open the app.
+2. Open **Manage**.
+3. Open **Categories** to add a category or subcategory.
+4. Open **Accounts** to add an account.
+5. The app writes to the corresponding Sheet and invalidates its cached query.
+6. New values become available in the Add Transaction form.
 
-## Installing as an app on iPhone
+You can still edit the Sheets directly. Use stable IDs and do not rename the ID columns.
 
-Once deployed, open the URL in Safari → Share → "Add to Home Screen". This
-gives you a standalone app icon (PWA), no App Store needed.
+## GitHub Actions secrets
 
-## What's not built yet
+In GitHub: Settings -> Secrets and variables -> Actions -> New repository secret.
 
-Budgets, Recurring/Subscriptions, Goals, Investments detail, Net Worth,
-Merchants management, Yearly reports, Category management UI (edit via the
-Google Sheet directly for now). Each follows the same pattern as
-`features/transactions/` — a query hook + a form/list component + a route.
+Create:
+
+- `VITE_API_BASE_URL`: Apps Script `/exec` URL.
+- `VITE_API_TOKEN`: Script Properties API token.
+
+Never commit `frontend/.env`.
