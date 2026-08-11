@@ -8,7 +8,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 const REPO_NAME = 'personal-finance-tracker';
 
 export default defineConfig({
-  base: `/${REPO_NAME}/`,
+  base: `/${https://github.com/architjain-12/Expense-Tracker}/`,
   plugins: [
     react(),
     VitePWA({
