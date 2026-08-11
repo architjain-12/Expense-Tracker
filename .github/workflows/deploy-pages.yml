@@ -1,111 +1,187 @@
-# This workflow automatically builds and deploys the React/Vite frontend
-# whenever you push changes to the main branch.
+# -----------------------------------------------------------------------------
+# PERSONAL FINANCE TRACKER
+# GITHUB PAGES DEPLOYMENT
+# -----------------------------------------------------------------------------
+#
+# This workflow builds the React/Vite frontend and deploys it to GitHub Pages.
+#
+# It runs automatically whenever code is pushed to the main branch.
+# It can also be started manually from GitHub Actions.
+# -----------------------------------------------------------------------------
 
-name: Deploy Frontend to GitHub Pages
+name: Deploy Finance Tracker
 
-# ---------------------------------------------------------
-# WHEN SHOULD THIS WORKFLOW RUN?
-# ---------------------------------------------------------
+# -----------------------------------------------------------------------------
+# WORKFLOW TRIGGERS
+# -----------------------------------------------------------------------------
+
 on:
-  # Run automatically whenever code is pushed to main.
+
+  # Run whenever code is pushed to the main branch.
   push:
     branches:
       - main
 
-  # Also allow you to manually start the workflow
-  # from GitHub Actions -> Run workflow.
+  # Allow manual execution from:
+  #
+  # GitHub
+  #   -> Actions
+  #      -> Deploy Finance Tracker
+  #         -> Run workflow
+  #
   workflow_dispatch:
 
-# ---------------------------------------------------------
-# PERMISSIONS
-# ---------------------------------------------------------
-# GitHub Pages requires these permissions to publish
-# the generated frontend.
+# -----------------------------------------------------------------------------
+# GITHUB PERMISSIONS
+# -----------------------------------------------------------------------------
+
 permissions:
+  # Allows the workflow to read repository contents.
   contents: read
+
+  # Required for GitHub Pages deployment.
   pages: write
+
+  # Required by GitHub Pages deployment.
   id-token: write
 
-# Prevent two deployments from running at the same time.
+# -----------------------------------------------------------------------------
+# CONCURRENCY
+# -----------------------------------------------------------------------------
+#
+# Prevent multiple GitHub Pages deployments from running simultaneously.
+# -----------------------------------------------------------------------------
+
 concurrency:
-  group: "pages"
+  group: pages
   cancel-in-progress: true
+
+# -----------------------------------------------------------------------------
+# JOBS
+# -----------------------------------------------------------------------------
 
 jobs:
 
-  # =======================================================
+  # ===========================================================================
   # BUILD JOB
-  # =======================================================
+  # ===========================================================================
+
   build:
 
-    # Use GitHub's Ubuntu virtual machine.
+    # GitHub provides an Ubuntu virtual machine.
     runs-on: ubuntu-latest
 
     steps:
 
-      # ---------------------------------------------------
-      # STEP 1 - Get the source code
-      # ---------------------------------------------------
+      # -----------------------------------------------------------------------
+      # STEP 1 - CHECKOUT SOURCE CODE
+      # -----------------------------------------------------------------------
+
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ---------------------------------------------------
-      # STEP 2 - Install Node.js
-      # ---------------------------------------------------
+      # -----------------------------------------------------------------------
+      # STEP 2 - SETUP NODE.JS
+      # -----------------------------------------------------------------------
+      #
+      # IMPORTANT:
+      # We intentionally do NOT enable npm caching here.
+      #
+      # The current project does not have package-lock.json yet.
+      #
+      # Once package-lock.json is committed, we can safely add:
+      #
+      #     cache: npm
+      #
+      # -----------------------------------------------------------------------
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
 
-      # ---------------------------------------------------
-      # STEP 3 - Install frontend dependencies
-      # ---------------------------------------------------
-      - name: Install dependencies
+      # -----------------------------------------------------------------------
+      # STEP 3 - INSTALL FRONTEND DEPENDENCIES
+      # -----------------------------------------------------------------------
+
+      - name: Install frontend dependencies
         working-directory: frontend
-        run: npm ci
+        run: npm install --no-audit --no-fund
 
-      # ---------------------------------------------------
-      # STEP 4 - Build React/Vite application
+      # -----------------------------------------------------------------------
+      # STEP 4 - BUILD FRONTEND
+      # -----------------------------------------------------------------------
       #
-      # These values are read from GitHub repository secrets.
+      # VITE_BASE_PATH tells Vite where the application will be hosted.
       #
-      # IMPORTANT:
-      # The values are embedded into the frontend during build.
-      # ---------------------------------------------------
+      # For example, if the GitHub repository is:
+      #
+      #     personal-finance-tracker
+      #
+      # GitHub Pages will host it at:
+      #
+      #     /personal-finance-tracker/
+      #
+      # -----------------------------------------------------------------------
+
       - name: Build frontend
         working-directory: frontend
         env:
+
+          # Automatically determine the repository name.
+          VITE_BASE_PATH: /${{ github.event.repository.name }}/
+
+          # Google Apps Script Web App URL.
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+
+          # Apps Script API token.
           VITE_API_TOKEN: ${{ secrets.VITE_API_TOKEN }}
+
         run: npm run build
 
-      # ---------------------------------------------------
-      # STEP 5 - Configure GitHub Pages
-      # ---------------------------------------------------
-      - name: Setup Pages
+      # -----------------------------------------------------------------------
+      # STEP 5 - CREATE GITHUB PAGES SPA FALLBACK
+      # -----------------------------------------------------------------------
+      #
+      # Your application uses React Router.
+      #
+      # GitHub Pages doesn't automatically understand routes such as:
+      #
+      #     /transactions
+      #     /reports
+      #     /manage
+      #
+      # Creating 404.html from index.html allows the React application to
+      # handle those routes.
+      # -----------------------------------------------------------------------
+
+      - name: Create GitHub Pages SPA fallback
+        working-directory: frontend
+        run: cp dist/index.html dist/404.html
+
+      # -----------------------------------------------------------------------
+      # STEP 6 - CONFIGURE GITHUB PAGES
+      # -----------------------------------------------------------------------
+
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      # ---------------------------------------------------
-      # STEP 6 - Upload generated frontend
-      #
-      # Vite normally creates the production files in:
-      #
-      # frontend/dist
-      # ---------------------------------------------------
+      # -----------------------------------------------------------------------
+      # STEP 7 - UPLOAD BUILD ARTIFACT
+      # -----------------------------------------------------------------------
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: frontend/dist
 
-
-  # =======================================================
+  # ===========================================================================
   # DEPLOY JOB
-  # =======================================================
+  # ===========================================================================
+
   deploy:
 
-    # This job depends on the build job.
+    # Wait for the build job to complete successfully.
     needs: build
 
     # GitHub Pages environment.
@@ -113,13 +189,15 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
+    # Use Ubuntu for deployment.
     runs-on: ubuntu-latest
 
     steps:
 
-      # ---------------------------------------------------
-      # Deploy the generated frontend to GitHub Pages.
-      # ---------------------------------------------------
+      # -----------------------------------------------------------------------
+      # DEPLOY TO GITHUB PAGES
+      # -----------------------------------------------------------------------
+
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
