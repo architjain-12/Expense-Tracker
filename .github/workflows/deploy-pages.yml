@@ -101,7 +101,7 @@ jobs:
       # -----------------------------------------------------------------------
 
       - name: Install frontend dependencies
-        working-directory: personal-finance-tracker/frontend
+        working-directory: personal-finance-tracker/
         run: npm install --no-audit --no-fund
 
       # -----------------------------------------------------------------------
@@ -109,7 +109,7 @@ jobs:
       # -----------------------------------------------------------------------
 
       - name: Build frontend
-        working-directory: personal-finance-tracker/frontend
+        working-directory: personal-finance-tracker/
         env:
 
           # GitHub repository name.
@@ -146,7 +146,7 @@ jobs:
       # -----------------------------------------------------------------------
 
       - name: Create GitHub Pages SPA fallback
-        working-directory: personal-finance-tracker/frontend
+        working-directory: personal-finance-tracker/
         run: cp dist/index.html dist/404.html
 
       # -----------------------------------------------------------------------
@@ -166,7 +166,7 @@ jobs:
 
           # IMPORTANT:
           # The Vite production build is here.
-          path: personal-finance-tracker/frontend/dist
+          path: personal-finance-tracker/dist
 
   # ===========================================================================
   # DEPLOY
