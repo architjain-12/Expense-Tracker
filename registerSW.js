@@ -1,1 +1,1 @@
-if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/https://github.com/architjain-12/Expense-Tracker/sw.js', { scope: '/https://github.com/architjain-12/Expense-Tracker/' })})}
+if('serviceWorker' in navigator) {window.addEventListener('load', () => {navigator.serviceWorker.register('/Expense-Tracker/sw.js', { scope: '/Expense-Tracker/' })})}
