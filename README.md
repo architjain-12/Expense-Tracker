@@ -1,29 +1,41 @@
-# Personal Finance Tracker
+# Frontend
 
-A free-to-run, mobile-first expense tracker for a salaried individual in
-India: Google Sheets as the database, a Google Apps Script Web App as the
-(also free) backend/API, a React PWA for entry + reports, and an iOS
-Shortcut for one-tap logging.
+React + TypeScript + Vite PWA. Talks directly to the Apps Script backend —
+no server of your own to run.
 
-Read first: **`docs/ARCHITECTURE.md`** — explains the shape of the system
-and the security tradeoff of the static-frontend + shared-token approach.
+## Local setup
 
-## Setup order
+```bash
+npm install
+cp .env.example .env      # fill in VITE_API_BASE_URL and VITE_API_TOKEN
+npm run dev
+```
 
-1. `google-apps-script/README.md` — deploy the backend (10 minutes).
-2. `frontend/README.md` — run locally, then deploy free to GitHub Pages.
-3. `ios-shortcut/IOS-SHORTCUT.md` — set up quick entry from your phone.
+Open the printed localhost URL — works on your phone too if you're on the
+same wifi (use your computer's LAN IP instead of localhost).
 
-## Status
+## Deploying free to GitHub Pages
 
-Phase 1 (this build): transactions, categories/subcategories, accounts,
-monthly dashboard + category chart, web entry, Shortcut entry.
+1. Push this `frontend/` folder (or the whole repo) to a GitHub repo.
+2. In `vite.config.ts`, set `REPO_NAME` to your actual repo name.
+3. `npm install` (adds `gh-pages` as a dev dependency, already in package.json).
+4. `npm run deploy` — builds and pushes `dist/` to a `gh-pages` branch.
+5. In the GitHub repo settings → Pages → set source to the `gh-pages` branch.
+6. Your app is now at `https://<your-username>.github.io/<repo-name>/`.
 
-Phase 2 (not built yet, see `docs/ARCHITECTURE.md`): AI-assisted
-categorization and natural-language reports, added as a small serverless
-function alongside the same Apps Script API — no rearchitecture needed.
+Because `.env` is not committed (it's gitignored), your token isn't in the
+repo — but it *is* baked into the built JS bundle that ships to the browser,
+per the security note in `docs/ARCHITECTURE.md`. If you want a private-ish
+URL, keep the exact GitHub Pages URL out of anywhere public.
 
-Also not built yet, same extension pattern each time: Budgets, Recurring
-expenses, Subscriptions, Goals, Investments detail, Net Worth, Yearly
-reports, Merchant management, in-app category editing (edit the Sheet
-directly for now).
+## Installing as an app on iPhone
+
+Once deployed, open the URL in Safari → Share → "Add to Home Screen". This
+gives you a standalone app icon (PWA), no App Store needed.
+
+## What's not built yet
+
+Budgets, Recurring/Subscriptions, Goals, Investments detail, Net Worth,
+Merchants management, Yearly reports, Category management UI (edit via the
+Google Sheet directly for now). Each follows the same pattern as
+`features/transactions/` — a query hook + a form/list component + a route.
