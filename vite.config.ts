@@ -5,7 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 // IMPORTANT: if you deploy to https://<username>.github.io/<repo-name>/,
 // set base to '/<repo-name>/'. If you deploy to a custom domain or the root
 // of <username>.github.io, use '/'.
-const REPO_NAME = 'https://github.com/architjain-12/Expense-Tracker';
+const REPO_NAME = 'Expense-Tracker';
 
 export default defineConfig({
   base: `/${REPO_NAME}/`,
