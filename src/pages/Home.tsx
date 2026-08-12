@@ -25,17 +25,7 @@ export default function Home(){
     <section className="metric-grid"><MetricCard label="Spent this month" value={formatCurrency(summary.expenses)}/><MetricCard label="Transactions" value={String(summary.transactionCount)}/>{summary.income>0&&<MetricCard label="Income" value={formatCurrency(summary.income)}/>} {summary.income>0&&<MetricCard label="Remaining" value={formatCurrency(summary.income-summary.expenses)}/>}</section>
     <section className="content-grid"><div className="panel large-panel"><div className="panel-header"><div><h2>Recent transactions</h2><p>Latest confirmed activity</p></div><Link to="/transactions" className="text-link">View all</Link></div><TransactionList transactions={recent} accounts={accounts} categories={categories} onSelect={t=>navigate(`/transactions/${t.id}`)}/></div>
       <div className="panel"><div className="panel-header"><div><h2>Spending trend</h2><p>Current month</p></div></div><div className="chart-box"><ResponsiveContainer width="100%" height={180}><LineChart data={series}><Tooltip contentStyle={{background:'#15181d',border:'1px solid #2b3038',borderRadius:12,color:'#fff'}} formatter={(v)=>[formatCurrency(Number(v)),'Spent']}/><Line type="monotone" dataKey="amount" stroke="#7c8cff" strokeWidth={3} dot={false}/></LineChart></ResponsiveContainer></div>
-        <div className="panel-header mini"><div><h3>Spend by category</h3><p>Tap a slice or row to drill down.</p></div></div>{categoryData.length?<><div className="chart-box"><ResponsiveContainer width="100%" height={230}><PieChart><Pie data={categoryData} dataKey="amount" nameKey="name" innerRadius="48%" outerRadius="78%" onClick={(_, index) => {
-  const selected = categoryData[index];
-
-  if (!selected) {
-    return;
-  }
-
-  navigate(
-    `/transactions?month=${new Date().toISOString().slice(0,7)}&category=${selected.id}`
-  );
-}}>{categoryData.map((c,i)=><Cell key={c.id} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}</Pie><Tooltip formatter={(v)=>formatCurrency(Number(v))}/></PieChart></ResponsiveContainer></div><div className="stacked-list">{categoryData.map(c=><button className="stat-row clickable" key={c.id} onClick={()=>navigate(`/transactions?month=${new Date().toISOString().slice(0,7)}&category=${c.id}`)}><span>{c.name}</span><strong>{formatCurrency(c.amount)} <ChevronRight size={14}/></strong></button>)}</div></>:<div className="empty-inline">Categories will appear after you record spending.</div>}
+        <div className="panel-header mini"><div><h3>Spend by category</h3><p>Tap a slice or row to drill down.</p></div></div>{categoryData.length?<><div className="chart-box"><ResponsiveContainer width="100%" height={230}><PieChart><Pie data={categoryData} dataKey="amount" nameKey="name" innerRadius="48%" outerRadius="78%" onClick={(entry)=>navigate(`/transactions?month=${new Date().toISOString().slice(0,7)}&category=${entry.id}`)}>{categoryData.map((c,i)=><Cell key={c.id} fill={PIE_COLORS[i%PIE_COLORS.length]}/>)}</Pie><Tooltip formatter={(v)=>formatCurrency(Number(v))}/></PieChart></ResponsiveContainer></div><div className="stacked-list">{categoryData.map(c=><button className="stat-row clickable" key={c.id} onClick={()=>navigate(`/transactions?month=${new Date().toISOString().slice(0,7)}&category=${c.id}`)}><span>{c.name}</span><strong>{formatCurrency(c.amount)} <ChevronRight size={14}/></strong></button>)}</div></>:<div className="empty-inline">Categories will appear after you record spending.</div>}
       </div></section>
   </div>;
 }

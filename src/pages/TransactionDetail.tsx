@@ -16,26 +16,11 @@ export default function TransactionDetail() {
   const category = categories.find(c => c.id === transaction?.categoryId);
   const subcategory = categories.find(c => c.id === transaction?.subcategoryId);
 
-  if (!transaction) {
-    return (
-      <div className="empty-state">
-        <h3>Transaction not found</h3>
-        <button
-          className="text-link"
-          onClick={() => navigate('/transactions')}
-        >
-          Back to transactions
-        </button>
-      </div>
-    );
-  }
-  
-  const currentTransaction = transaction;
-  
+  if (!transaction) return <div className="empty-state"><h3>Transaction not found</h3><button className="text-link" onClick={() => navigate('/transactions')}>Back to transactions</button></div>;
+
   async function remove() {
     if (!confirm('Delete this transaction?')) return;
-  
-    await deleteTransaction(currentTransaction.id);
+    await deleteTransaction(transaction.id);
     navigate('/transactions');
   }
 
