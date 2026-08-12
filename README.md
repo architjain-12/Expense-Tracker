@@ -155,3 +155,17 @@ Record / Discard
 ```
 
 See the included Shortcut instructions in `docs/SETUP.md` and `docs/MOBILE-MOCKUPS.md`.
+
+
+## Build troubleshooting
+
+The project uses TypeScript declaration packages for React and Node. If a fresh clone reports errors such as `Cannot find a declaration file for module 'react'` or `Cannot find name 'process'`, make sure `npm install` has completed successfully. The project now uses `loadEnv()` in `vite.config.ts` rather than `process.env`.
+
+Run:
+
+```bash
+npm install
+npm run build
+```
+
+Do not use `vite build` alone to bypass TypeScript checks; the intended build is `tsc -b && vite build`.
