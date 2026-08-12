@@ -20,19 +20,42 @@ export default function AppLockGuard({ children }: { children: ReactNode }) {
   }, [settings?.lockEnabled, settings?.lockMethod, settings?.passkeyCredentialId]);
 
   if (!settings?.lockEnabled || unlocked) return <>{children}</>;
+  const currentSettings = settings;
 
   async function unlockPin() {
     setError('');
-    if (!settings.localPinHash) { setError('PIN lock is not configured correctly.'); return; }
-    if ((await hashPin(pin)) === settings.localPinHash) { setUnlocked(true); setPin(''); }
-    else { setError('Incorrect PIN.'); setPin(''); }
+  
+    if (!currentSettings.localPinHash) {
+      setError('PIN lock is not configured correctly.');
+      return;
+    }
+  
+    if ((await hashPin(pin)) === currentSettings.localPinHash) {
+      setUnlocked(true);
+      setPin('');
+    } else {
+      setError('Incorrect PIN.');
+      setPin('');
+    }
   }
 
   async function unlockPasskey() {
     setError('');
-    if (!settings.passkeyCredentialId) return;
-    const ok = await verifyLocalPasskey(settings.passkeyCredentialId);
-    if (ok) setUnlocked(true); else setError('Device verification was not completed.');
+  
+    if (!currentSettings.passkeyCredentialId) {
+      setError('Passkey is not configured.');
+      return;
+    }
+  
+    const ok = await verifyLocalPasskey(
+      currentSettings.passkeyCredentialId
+    );
+  
+    if (ok) {
+      setUnlocked(true);
+    } else {
+      setError('Device verification was not completed.');
+    }
   }
 
   return <div className="lock-screen">
