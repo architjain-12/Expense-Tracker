@@ -1,5 +1,6 @@
 import { db } from '../db/database';
 import type { ReviewQueueItem } from '../types/models';
+import { newId } from '../utils/id';
 
 /**
  * Imports newline-delimited JSON (NDJSON) from an iOS Shortcut export file.
@@ -30,7 +31,7 @@ export async function importAutomationNdjson(file: File): Promise<AutomationImpo
       }
 
       const item: ReviewQueueItem = {
-        id: crypto.randomUUID(),
+        id: newId('queue'),
         externalId: String(raw.externalId),
         amount: Number(raw.amount),
         type: raw.type === 'INCOME' ? 'INCOME' : 'EXPENSE',

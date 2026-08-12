@@ -1,118 +1,253 @@
-# React code flow for a beginner
+# How the React code connects — beginner guide
 
-You do not need to understand React before running this project. Use this mental model:
+You do not need to know React to follow this project.
+
+## 1. Start with `src/main.tsx`
+
+This is the browser entry point.
 
 ```text
-A screen is a Component.
-A button click calls a Service.
-A Service changes IndexedDB.
-A Hook watches IndexedDB.
-React redraws the screen.
+index.html
+   ↓
+src/main.tsx
+   ↓
+src/app/App.tsx
 ```
 
-## Example: Add a transaction
+`main.tsx` mounts React into the `<div id="root">` in `index.html`.
+
+It also registers the PWA service worker.
+
+## 2. `src/app/App.tsx`
+
+This sets up routing.
 
 ```text
-User taps "Record"
-        |
-        v
-AddTransaction.tsx
-        |
-        | save()
-        v
-transactionService.ts
-        |
-        | createTransaction()
-        v
-Dexie database.ts
-        |
-        | db.transactions.put(...)
-        v
-IndexedDB
-        |
-        | database changed
-        v
-useLiveQuery() in useDb.ts
-        |
-        v
-React rerenders
-        |
-        v
-Transaction appears on screen
+/                → Home
+/transactions    → Transactions
+/add             → Add Transaction
+/review          → Review Queue
+/stats           → Statistics
+/categories      → Categories
+/recurring       → Recurring Payments
+/budgets         → Budgets
+/investments     → Investments
+/options         → Options
+/settings        → Settings
 ```
 
-## Example: Review Queue
+It also runs startup work:
 
 ```text
-iOS Shortcut creates NDJSON
-        |
-        v
-User opens React app
-        |
-        v
-ReviewQueue.tsx
-        |
-        | choose file
-        v
-automationService.ts
-        |
-        | parse each line
-        v
-IndexedDB.reviewQueue
-        |
-        v
-Review Queue screen updates
-```
-
-## Example: Recurring payment
-
-```text
-App starts
-    |
-    v
-App.tsx Bootstrap
-    |
-    v
+ensureSeedData()
 processDueRecurringTransactions()
-    |
-    v
-recurringRules table
-    |
-    | rule is due
-    v
-createTransaction()
-    |
-    v
-transactions table
+restoreFromGoogleSheetsIfEmpty()
 ```
 
-## Example: Google Sheets sync
+## 3. `src/components/Layout.tsx`
+
+This creates the navigation around every page.
+
+Desktop:
 
 ```text
-Settings → Sync Now
-        |
-        v
-googleSheetsService.ts
-        |
-        v
-syncQueue table
-        |
-        v
-HTTP POST
-        |
-        v
-Google Apps Script
-        |
-        v
-Google Sheets
+Sidebar
+   ↓
+Page content
 ```
 
-## What React means in this project
+Mobile:
 
-React's main job is deciding **what the screen looks like** based on current data and user actions.
+```text
+Page content
+   ↓
+Fixed five-button navigation
+```
 
-It is not the database.
-It is not the Google Sheets server.
-It is not the iOS Shortcut.
+The five mobile buttons are:
 
-Those responsibilities are intentionally separated.
+```text
+Home | Transactions | + | Stats | Options
+```
+
+## 4. A page
+
+Example:
+
+```text
+src/pages/AddTransaction.tsx
+```
+
+It displays form fields and calls a service when Save is pressed.
+
+It should NOT directly contain complex IndexedDB logic.
+
+## 5. Services
+
+Example:
+
+```text
+src/services/transactionService.ts
+```
+
+This is where business rules live.
+
+When the Add Transaction page calls:
+
+```text
+createTransaction(...)
+```
+
+that service creates the object and writes it into IndexedDB.
+
+## 6. IndexedDB
+
+`src/db/database.ts` defines the tables.
+
+Dexie creates a browser database called:
+
+```text
+ExpenseTrackerDB
+```
+
+Important tables:
+
+```text
+transactions
+categories
+accounts
+recurringRules
+reviewQueue
+budgets
+investments
+syncQueue
+settings
+```
+
+## 7. Live UI updates
+
+The hooks in `src/hooks/useDb.ts` use Dexie's `useLiveQuery`.
+
+Example:
+
+```text
+IndexedDB changes
+      ↓
+useTransactions()
+      ↓
+Component rerenders
+```
+
+This is why you usually do not need to call a manual refresh after saving a transaction.
+
+## 8. Repository layer
+
+`src/db/repositories.ts` contains simple database access functions.
+
+It keeps storage code separate from React UI.
+
+That makes it possible to replace IndexedDB later if needed.
+
+## 9. Sync
+
+Local changes create `syncQueue` items.
+
+```text
+Transaction saved
+      ↓
+IndexedDB transaction
+      ↓
+syncQueue item
+      ↓
+Google Sheets sync later
+```
+
+This is why offline operation works.
+
+## 10. Automation
+
+The iOS Shortcut creates NDJSON.
+
+```text
+iOS Shortcut
+      ↓
+transaction-queue.ndjson
+      ↓
+Review → Sync Automation
+      ↓
+automationService.ts
+      ↓
+reviewQueue
+      ↓
+Record
+      ↓
+transactionService.ts
+      ↓
+transactions
+```
+
+## 11. Recurring transactions
+
+`recurringService.ts` checks active recurring rules whenever the app starts/resumes.
+
+```text
+Recurring rule due
+      ↓
+createTransaction()
+      ↓
+source = RECURRING
+      ↓
+normal transaction
+```
+
+The UI shows a `↻` marker for that transaction.
+
+## 12. Why `crypto.randomUUID()` was replaced
+
+Some local development contexts do not expose `crypto.randomUUID()`.
+
+The project now uses:
+
+```text
+src/utils/id.ts
+```
+
+which falls back to `crypto.getRandomValues()` or a timestamp/random value.
+
+This makes local development more forgiving.
+
+## 13. Google Sheets restore
+
+The restore path is:
+
+```text
+Settings
+   ↓
+Restore from Sheets
+   ↓
+googleSheetsService.ts
+   ↓
+Google Apps Script
+   ↓
+Google Sheets
+   ↓
+IndexedDB
+```
+
+If a valid Google Sheets connection already exists, the app can also attempt a restore automatically when the local transaction table is empty.
+
+## 14. Device lock
+
+`src/services/authService.ts` contains the local lock helpers.
+
+`AppLockGuard.tsx` checks the setting before showing the application.
+
+The two options are:
+
+```text
+PIN
+or
+Passkey / platform authenticator
+```
+
+The passkey path is intended as a device-local convenience lock. Full identity authentication would require a server to verify WebAuthn assertions.

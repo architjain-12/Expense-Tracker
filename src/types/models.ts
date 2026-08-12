@@ -1,11 +1,4 @@
-/**
- * Domain models for the application.
- *
- * Think of these interfaces as the "shape" of data moving through the app.
- * React components render these objects; repositories store them in IndexedDB;
- * services apply business rules to them.
- */
-
+/** Domain models used by the React UI, services and IndexedDB. */
 export type TransactionType = 'EXPENSE' | 'INCOME' | 'TRANSFER';
 export type TransactionSource = 'MANUAL' | 'AUTOMATION' | 'RECURRING' | 'IMPORT';
 export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCED' | 'FAILED';
@@ -47,6 +40,7 @@ export interface Account {
   updatedAt: string;
 }
 
+/** Categories are hierarchical: parentId undefined = category, parentId set = subcategory. */
 export interface Category {
   id: string;
   name: string;
@@ -100,6 +94,7 @@ export interface ReviewQueueItem {
   source: 'IOS_SHORTCUT' | 'MANUAL' | 'IMPORT';
   status: QueueStatus;
   suggestedCategoryId?: string;
+  suggestedSubcategoryId?: string;
   suggestedAccountId?: string;
   notes?: string;
   createdAt: string;
@@ -117,6 +112,20 @@ export interface Budget {
   updatedAt: string;
 }
 
+export interface InvestmentEntry {
+  id: string;
+  date: string;
+  name: string;
+  assetType: 'STOCK' | 'MUTUAL_FUND' | 'SIP' | 'FIXED_DEPOSIT' | 'GOLD' | 'RETIREMENT_PF' | 'OTHER';
+  type: 'CONTRIBUTION' | 'REDEMPTION' | 'DIVIDEND' | 'INTEREST';
+  amount: number;
+  accountId?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  syncStatus: SyncStatus;
+}
+
 export interface AppSettings {
   id: 'app';
   currency: string;
@@ -129,6 +138,10 @@ export interface AppSettings {
   googleSheetsToken?: string;
   lastSuccessfulSync?: string;
   googleSheetsEnabled: boolean;
+  lockEnabled?: boolean;
+  lockMethod?: 'PASSKEY' | 'PIN';
+  passkeyCredentialId?: string;
+  localPinHash?: string;
 }
 
 export interface SyncQueueItem {

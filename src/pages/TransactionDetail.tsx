@@ -14,6 +14,7 @@ export default function TransactionDetail() {
   const categories = useCategories();
   const account = accounts.find(a => a.id === transaction?.accountId);
   const category = categories.find(c => c.id === transaction?.categoryId);
+  const subcategory = categories.find(c => c.id === transaction?.subcategoryId);
 
   if (!transaction) return <div className="empty-state"><h3>Transaction not found</h3><button className="text-link" onClick={() => navigate('/transactions')}>Back to transactions</button></div>;
 
@@ -28,7 +29,7 @@ export default function TransactionDetail() {
     <div className="detail-amount"><span className="eyebrow">{transaction.type === 'INCOME' ? 'Income' : 'Expense'}</span><strong className={transaction.type === 'INCOME' ? 'positive' : ''}>{transaction.type === 'INCOME' ? '+' : '-'}{formatCurrency(transaction.amount)}</strong><span>{new Date(transaction.transactionDateTime).toLocaleString('en-IN')}</span></div>
     <div className="detail-card">
       <Detail label="Account" value={account?.name || 'Unknown'} />
-      <Detail label="Category" value={category?.name || 'Uncategorized'} />
+      <Detail label="Category" value={subcategory ? `${category?.name || 'Category'} · ${subcategory.name}` : category?.name || 'Uncategorized'} />
       <Detail label="Merchant" value={transaction.merchant || '—'} />
       <Detail label="Notes" value={transaction.notes || '—'} />
       <Detail label="Source" value={transaction.source === 'RECURRING' ? '↻ Recurring payment' : transaction.source === 'AUTOMATION' ? '⚡ Automated' : transaction.source} />
