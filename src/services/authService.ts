@@ -38,15 +38,35 @@ export async function registerLocalPasskey(): Promise<string> {
   if (!webAuthnAvailable()) throw new Error('Passkeys are not available in this browser. Use a PIN instead.');
   const challenge = randomChallenge();
   const userId = randomChallenge();
+
   const credential = await navigator.credentials.create({
     publicKey: {
-      challenge,
-      rp: { name: 'Expense Tracker', id: window.location.hostname },
-      user: { id: userId, name: 'local-user', displayName: 'Expense Tracker' },
-      pubKeyCredParams: [{ type: 'public-key', alg: -7 }, { type: 'public-key', alg: -257 }],
-      authenticatorSelection: { authenticatorAttachment: 'platform', residentKey: 'required', userVerification: 'required' },
-      timeout: 60000,
-    },
+      challenge: challenge.buffer as ArrayBuffer,
+
+      rp: {
+        name: 'Expense Tracker',
+        id: window.location.hostname
+      },
+
+      user: {
+        id: userId.buffer as ArrayBuffer,
+        name: 'local-user',
+        displayName: 'Expense Tracker'
+      },
+
+      pubKeyCredParams: [
+        { type: 'public-key', alg: -7 },
+        { type: 'public-key', alg: -257 }
+      ],
+
+      authenticatorSelection: {
+        authenticatorAttachment: 'platform',
+        residentKey: 'required',
+        userVerification: 'required'
+      },
+
+      timeout: 60000
+    }
   }) as PublicKeyCredential | null;
   if (!credential) throw new Error('Could not create a passkey.');
   return bytesToBase64Url(new Uint8Array(credential.rawId));
@@ -58,11 +78,19 @@ export async function verifyLocalPasskey(credentialId: string): Promise<boolean>
     const raw = Uint8Array.from(atob(credentialId.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
     const assertion = await navigator.credentials.get({
       publicKey: {
-        challenge: randomChallenge(),
-        allowCredentials: [{ id: raw, type: 'public-key', transports: ['internal'] }],
+        challenge: randomChallenge().buffer as ArrayBuffer,
+    
+        allowCredentials: [
+          {
+            id: raw,
+            type: 'public-key',
+            transports: ['internal']
+          }
+        ],
+    
         userVerification: 'required',
-        timeout: 60000,
-      },
+        timeout: 60000
+      }
     });
     return !!assertion;
   } catch {
