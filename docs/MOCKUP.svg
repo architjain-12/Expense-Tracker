@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+  <rect width="1200" height="820" fill="#080a0d"/>
+  <style>
+    .t{font-family:Inter,Arial,sans-serif;fill:#f5f7fa}.m{font-family:Inter,Arial,sans-serif;fill:#949cab}.s{font-family:Inter,Arial,sans-serif;fill:#7c8cff}.card{fill:#15181d;stroke:#2a2f38;stroke-width:2}.line{stroke:#2a2f38;stroke-width:1}.green{fill:#49d597}.red{fill:#ff6b7a}
+  </style>
+  <!-- phone -->
+  <rect x="70" y="45" width="390" height="730" rx="42" fill="#101217" stroke="#343a45" stroke-width="3"/>
+  <rect x="88" y="75" width="354" height="674" rx="30" fill="#0b0d10"/>
+  <text x="110" y="113" class="t" font-size="17" font-weight="700">Expense Tracker</text>
+  <text x="110" y="135" class="m" font-size="10">August 12, 2026</text>
+  <text x="110" y="184" class="t" font-size="36" font-weight="700">₹24,680</text>
+  <text x="110" y="205" class="m" font-size="11">spent this month · 42 transactions</text>
+  <rect x="110" y="228" width="310" height="46" rx="12" fill="#7c8cff"/>
+  <text x="265" y="257" text-anchor="middle" font-size="13" font-weight="700" fill="#0b0d10">+ Add Transaction</text>
+  <rect x="110" y="292" width="310" height="52" rx="12" fill="#211e12" stroke="#4a3d26"/>
+  <text x="124" y="313" class="m" font-size="10">⚡ 3 transactions need review</text>
+  <text x="124" y="330" class="t" font-size="11" font-weight="700">Open Review →</text>
+  <text x="110" y="374" class="m" font-size="10" font-weight="700">TODAY</text>
+  <text x="110" y="405" class="t" font-size="13">Amazon</text><text x="110" y="423" class="m" font-size="10">Shopping · HDFC · 7:42 PM</text><text x="390" y="409" text-anchor="end" class="red" font-size="13">-₹1,299</text>
+  <line x1="110" y1="438" x2="420" y2="438" class="line"/>
+  <text x="110" y="468" class="t" font-size="13">Swiggy</text><text x="110" y="486" class="m" font-size="10">Food · HDFC · 1:15 PM</text><text x="390" y="472" text-anchor="end" class="red" font-size="13">-₹480</text>
+  <line x1="110" y1="501" x2="420" y2="501" class="line"/>
+  <text x="110" y="532" class="m" font-size="10">AUGUST SPENDING</text>
+  <polyline points="112,600 145,585 180,606 215,550 250,580 285,530 320,556 355,505 390,540" fill="none" stroke="#7c8cff" stroke-width="4"/>
+  <line x1="110" y1="615" x2="420" y2="615" class="line"/>
+  <rect x="88" y="690" width="354" height="59" rx="0 0 30 30" fill="#101217"/>
+  <text x="125" y="724" class="m" font-size="9">Home</text><text x="196" y="724" class="m" font-size="9">Transactions</text><circle cx="265" cy="718" r="21" fill="#6471dc"/><text x="265" y="724" text-anchor="middle" font-size="20" fill="#0b0d10">+</text><text x="333" y="724" class="m" font-size="9">Reports</text><text x="399" y="724" text-anchor="end" class="m" font-size="9">More</text>
+
+  <!-- desktop -->
+  <rect x="520" y="45" width="620" height="730" rx="18" class="card"/>
+  <rect x="520" y="45" width="170" height="730" rx="18" fill="#0e1014"/>
+  <text x="548" y="82" class="t" font-size="16" font-weight="700">Expense Tracker</text>
+  <text x="548" y="100" class="m" font-size="9">Local-first finance</text>
+  <text x="548" y="145" class="t" font-size="12">◉ Home</text>
+  <text x="548" y="180" class="m" font-size="12">▤ Transactions</text>
+  <text x="548" y="215" class="m" font-size="12">✓ Review</text>
+  <text x="548" y="250" class="m" font-size="12">◴ Reports</text>
+  <text x="548" y="295" class="m" font-size="12">Accounts</text>
+  <text x="548" y="327" class="m" font-size="12">Categories</text>
+  <text x="548" y="359" class="m" font-size="12">Budgets</text>
+  <text x="548" y="705" class="m" font-size="9">● Local data ready</text>
+  <text x="720" y="88" class="t" font-size="22" font-weight="700">August 2026</text>
+  <rect x="1018" y="66" width="92" height="36" rx="10" fill="#7c8cff"/><text x="1064" y="89" text-anchor="middle" font-size="10" font-weight="700" fill="#0b0d10">+ Add</text>
+  <rect x="720" y="125" width="190" height="105" rx="15" class="card"/><text x="740" y="149" class="m" font-size="10">Spent this month</text><text x="740" y="187" class="t" font-size="28" font-weight="700">₹24,680</text><text x="740" y="209" class="m" font-size="9">42 transactions</text>
+  <rect x="925" y="125" width="185" height="105" rx="15" class="card"/><text x="945" y="149" class="m" font-size="10">Top category</text><text x="945" y="187" class="t" font-size="20" font-weight="700">Food</text><text x="945" y="209" class="m" font-size="9">₹6,820</text>
+  <rect x="720" y="250" width="390" height="230" rx="15" class="card"/><text x="740" y="277" class="t" font-size="13" font-weight="700">Recent Transactions</text><text x="740" y="297" class="m" font-size="9">Latest confirmed activity</text>
+  <text x="740" y="337" class="t" font-size="11">Amazon</text><text x="740" y="353" class="m" font-size="9">Shopping · HDFC</text><text x="1085" y="341" text-anchor="end" class="red" font-size="11">-₹1,299</text>
+  <text x="740" y="385" class="t" font-size="11">Swiggy</text><text x="740" y="401" class="m" font-size="9">Food · HDFC</text><text x="1085" y="389" text-anchor="end" class="red" font-size="11">-₹480</text>
+  <text x="740" y="433" class="t" font-size="11">Uber</text><text x="740" y="449" class="m" font-size="9">Transport · HDFC</text><text x="1085" y="437" text-anchor="end" class="red" font-size="11">-₹320</text>
+  <rect x="720" y="500" width="390" height="220" rx="15" class="card"/><text x="740" y="528" class="t" font-size="13" font-weight="700">Spending Trend</text>
+  <polyline points="740,665 775,638 810,650 845,590 880,620 915,575 950,600 985,550 1020,580 1055,545 1090,565" fill="none" stroke="#7c8cff" stroke-width="3"/>
+  <line x1="740" y1="678" x2="1090" y2="678" class="line"/>
+</svg>
