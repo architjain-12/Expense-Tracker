@@ -1,48 +1,157 @@
-# Frontend - beginner guide
+# Expense Tracker PWA
 
-## What each folder does
+A dark, mobile-first personal expense tracker designed for iPhone Safari/Chrome and responsive desktop use.
 
-- `src/main.tsx`: starts React and enables React Query + routing.
-- `src/App.tsx`: navigation and application pages.
-- `src/api/client.ts`: every HTTP call to Apps Script.
-- `src/types/finance.ts`: TypeScript data model matching Sheet columns.
-- `src/features/transactions/`: transaction entry and transaction history.
-- `src/features/dashboard/`: monthly dashboard.
-- `src/features/reports/`: yearly reports and net worth.
-- `src/features/manage/`: budgets, recurring items, subscriptions, goals, investments, assets, liabilities, merchants, categories, accounts and settings.
-- `src/features/categories/useCategories.ts`: loads categories/accounts and caches them.
-- `index.css`: mobile/desktop layout and visual styling.
+## Final architecture
 
-## How to make a small frontend change
+```text
+React PWA
+   ↓
+Dexie / IndexedDB  ← primary local database
+   ├── Transactions
+   ├── Categories / Subcategories
+   ├── Accounts
+   ├── Review Queue
+   ├── Recurring Rules
+   ├── Budgets
+   ├── Investments
+   └── Settings
 
-1. Find the screen in `src/features/`.
-2. Change the JSX/text/class in that file.
-3. Run `npm run build` locally.
-4. Commit the change.
-5. Push to `main`.
-6. GitHub Actions runs `npm ci`, `npm run build` and deploys the result.
-7. Open the GitHub Pages URL. Because the app is a PWA, refresh once if an older cached version is displayed.
+Optional sync/reporting:
+IndexedDB → Google Apps Script → private Google Sheets
 
-## How to change categories/accounts
+Automation:
+iOS Shortcut → iCloud NDJSON → Sync Automation → Review Queue
+```
 
-You no longer need to edit the Sheet manually for normal changes.
+The application does not require a running Spring Boot server or hosted database for daily use.
 
-1. Open the app.
-2. Open **Manage**.
-3. Open **Categories** to add a category or subcategory.
-4. Open **Accounts** to add an account.
-5. The app writes to the corresponding Sheet and invalidates its cached query.
-6. New values become available in the Add Transaction form.
+## What is implemented
 
-You can still edit the Sheets directly. Use stable IDs and do not rename the ID columns.
+- Transaction-first Home screen
+- Fast expense/income entry with current date/time
+- Default account selection that waits for IndexedDB to load correctly
+- Full category + optional subcategory hierarchy
+- Category/subcategory customization and archiving
+- Frequently used categories first
+- Merchant and note suggestions (top five historical matches)
+- Current-month transaction screen by default
+- Month switching
+- Filtering by category, subcategory and account
+- Dedicated Stats screen with filtered charts
+- Clickable Home category pie chart → filtered transaction view
+- Review Queue for iOS Shortcut automation
+- NDJSON automation importer with duplicate protection
+- Recurring subscriptions / EMI / RD / rent and other scheduled transactions
+- Recurring transaction `↻` UI indicator
+- Investment activity tracking
+- Optional budgets
+- Daily/monthly/category/account analytics
+- JSON backup/restore
+- Google Sheets sync and smart restore
+- Empty-local-database recovery prompt
+- Local device lock with PIN or WebAuthn/passkey where supported
+- Responsive dark mobile-web and desktop UI
+- GitHub Pages deployment workflow
 
-## GitHub Actions secrets
+## Important privacy model
 
-In GitHub: Settings -> Secrets and variables -> Actions -> New repository secret.
+The public GitHub Pages site contains application code only. Personal transaction data and runtime Google Sheets configuration are stored locally in IndexedDB.
 
-Create:
+A local device lock can prevent accidental entry on a device, including passkey/device authentication where supported.
 
-- `VITE_API_BASE_URL`: Apps Script `/exec` URL.
-- `VITE_API_TOKEN`: Script Properties API token.
+The passkey feature is a **local device lock**, not a server-backed identity system. Full account authentication would require a trusted server to verify WebAuthn assertions.
 
-Never commit `frontend/.env`.
+## React beginner guide
+
+Read these files in order:
+
+1. `docs/CODE-FLOW.md`
+2. `docs/ARCHITECTURE.md`
+3. `docs/SETUP.md`
+
+The essential flow is:
+
+```text
+Button / form
+    ↓
+React page
+    ↓
+Service
+    ↓
+Dexie repository/database
+    ↓
+IndexedDB
+    ↓
+useLiveQuery
+    ↓
+React rerenders
+```
+
+For example:
+
+```text
+AddTransaction.tsx
+    ↓
+createTransaction()
+    ↓
+db.transactions.put()
+    ↓
+IndexedDB
+    ↓
+useTransactions()
+    ↓
+TransactionList
+```
+
+## Setup
+
+```bash
+npm install
+npm run dev
+```
+
+Then open the URL printed by Vite.
+
+Production build:
+
+```bash
+npm run build
+```
+
+## Google Sheets
+
+The React source never contains the personal Apps Script URL/token.
+
+Configure them at runtime under:
+
+```text
+Options → Settings → Google Sheets
+```
+
+The Apps Script implementation is under:
+
+```text
+google-apps-script/Code.gs
+google-apps-script/README.md
+```
+
+## iOS Shortcut automation
+
+The intended V1 automation path is:
+
+```text
+Bank notification
+    ↓
+iOS Shortcut
+    ↓
+transaction-queue.ndjson in iCloud Drive
+    ↓
+Expense Tracker → Review → Sync Automation
+    ↓
+Review Queue
+    ↓
+Record / Discard
+```
+
+See the included Shortcut instructions in `docs/SETUP.md` and `docs/MOBILE-MOCKUPS.md`.
