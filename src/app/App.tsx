@@ -22,4 +22,29 @@ import { restoreFromGoogleSheetsIfEmpty } from '../services/googleSheetsService'
 
 function Bootstrap(){useEffect(()=>{const run=async()=>{await ensureSeedData();await processDueRecurringTransactions();await restoreFromGoogleSheetsIfEmpty();};void run();},[]);return null;}
 
-export default function App(){return <BrowserRouter basename={import.meta.env.BASE_URL}><Bootstrap/><ErrorBoundary><AppLockGuard><Routes><Route element={<Layout/>}><Route path="/" element={<Home/>}/><Route path="/transactions" element={<Transactions/>}/><Route path="/transactions/:id" element={<TransactionDetail/>}/><Route path="/transactions/:id/edit" element={<EditTransaction/>}/><Route path="/add" element={<AddTransaction/>}/><Route path="/review" element={<ReviewQueue/>}/><Route path="/stats" element={<Stats/>}/><Route path="/reports" element={<Stats/>}/><Route path="/categories" element={<Categories/>}/><Route path="/budgets" element={<Budgets/>}/><Route path="/investments" element={<Investments/>}/><Route path="/recurring" element={<Recurring/>}/><Route path="/options" element={<Options/>}/><Route path="/settings" element={<Settings/>}/></Route></Routes></AppLockGuard></ErrorBoundary></BrowserRouter>}
+export default function App(){return <BrowserRouter basename={import.meta.env.BASE_URL}>
+    <Bootstrap/>
+    <ErrorBoundary>
+        <AppLockGuard>
+            <Routes>
+                <Route element={<Layout/>}>
+                <Route path="/" element={<Home/>}/>
+                <Route path="/transactions" element={<Transactions/>}/>
+                <Route path="/transactions/:id" element={<TransactionDetail/>}/>
+                <Route path="/transactions/:id/edit" element={<EditTransaction/>}/>
+                <Route path="/add" element={<AddTransaction/>}/>
+                <Route path="/review" element={<ReviewQueue/>}/>
+                <Route path="/stats" element={<Stats/>}/>
+                <Route path="/reports" element={<Stats/>}/>
+                <Route path="/categories" element={<Categories/>}/>
+                <Route path="/budgets" element={<Budgets/>}/>
+                <Route path="/investments" element={<Investments/>}/>
+                <Route path="/recurring" element={<Recurring/>}/>
+                <Route path="/options" element={<Options/>}/>
+                <Route path="/settings" element={<Settings/>}/>
+                </Route>
+            </Routes>
+        </AppLockGuard>
+    </ErrorBoundary>
+    </BrowserRouter>}
+
