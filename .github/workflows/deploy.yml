@@ -1,4 +1,4 @@
-name: Deploy Finance Tracker
+name: Deploy to GitHub Pages
 
 on:
   push:
@@ -17,16 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-
-  # ---------------------------------------------------------
-  # BUILD
-  # ---------------------------------------------------------
   build:
     runs-on: ubuntu-latest
 
     steps:
-
-      - name: Checkout repository
+      - name: Checkout main branch
         uses: actions/checkout@v4
         with:
           ref: main
@@ -35,40 +30,30 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
 
-      - name: Install frontend dependencies
-        working-directory: frontend
+      - name: Install dependencies
         run: npm ci
 
       - name: Build frontend
-        working-directory: frontend
         run: npm run build
 
-      - name: Setup Pages
+      - name: Setup GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload Pages artifact
+      - name: Upload frontend
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
 
-
-  # ---------------------------------------------------------
-  # DEPLOY
-  # ---------------------------------------------------------
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
 
     runs-on: ubuntu-latest
-
     needs: build
 
     steps:
-
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
