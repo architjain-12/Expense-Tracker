@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
   return {
     // GitHub Pages uses /<repository-name>/ when deployed as a project site.
     // For local development this remains '/'.
-    base: env.VITE_BASE_PATH || '/',
+    base: env.VITE_BASE_PATH || '/Expense-Tracker/',
 
     plugins: [
       react(),
