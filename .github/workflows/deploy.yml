@@ -1,4 +1,4 @@
-name: Deploy Expense Tracker
+name: Deploy Finance Tracker
 
 on:
   push:
@@ -9,49 +9,77 @@ on:
 
 permissions:
   contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
 
 jobs:
+
+  # ---------------------------------------------------------------------------
+  # BUILD
+  # ---------------------------------------------------------------------------
   build:
+
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+
+      # Checkout the repository.
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      # Install Node.js.
+      #
+      # No npm cache is used yet because your repository currently does not
+      # have a package-lock.json.
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: npm
+          node-version: 20
 
-      - name: Install dependencies
-        run: npm install
+      # Install dependencies from the repository ROOT.
+      #
+      # There is intentionally NO working-directory here.
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
 
+      # Build the Vite application from the repository ROOT.
       - name: Build
         run: npm run build
 
-      - name: Setup Pages
+      # GitHub Pages needs a fallback for React Router.
+      - name: Create GitHub Pages SPA fallback
+        run: cp dist/index.html dist/404.html
+
+      # Configure GitHub Pages.
+      - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      # Upload the Vite production build.
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./dist
+          path: dist
 
+  # ---------------------------------------------------------------------------
+  # DEPLOY
+  # ---------------------------------------------------------------------------
   deploy:
-    environment:
-      name: github-pages
-      url: gh-pages
 
     needs: build
 
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
     runs-on: ubuntu-latest
 
-    permissions:
-      pages: write
-      id-token: write
-
     steps:
+
+      # Deploy the generated dist/ directory to GitHub Pages.
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
