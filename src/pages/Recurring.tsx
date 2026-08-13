@@ -7,8 +7,69 @@ import { newId } from '../utils/id';
 import { queueEntitySync } from '../services/syncService';
 import { addMonths, addWeeks, addYears } from 'date-fns';
 
-function nextDate(f:Frequency,day:number,base=new Date()){let d=new Date(base);if(f==='WEEKLY')return addWeeks(d,1);if(f==='BIWEEKLY')return addWeeks(d,2);if(f==='QUARTERLY')return addMonths(d,3);if(f==='YEARLY')return addYears(d,1);d.setMonth(d.getMonth()+1);d.setDate(Math.min(day,new Date(d.getFullYear(),d.getMonth()+1,0).getDate()));return d;}
-export default function Recurring(){const rules=useRecurringRules();const accounts=useAccounts();const categories=useCategories();const [open,setOpen]=useState(false);const [editing,setEditing]=useState<RecurringRule|null>(null);const [name,setName]=useState('');const [amount,setAmount]=useState('');const [frequency,setFrequency]=useState<Frequency>('MONTHLY');const [day,setDay]=useState('1');const [accountId,setAccountId]=useState('');const [categoryId,setCategoryId]=useState('');const [subcategoryId,setSubcategoryId]=useState('');useEffect(()=>{if(!accountId)setAccountId(accounts.find(a=>a.isDefault)?.id||accounts[0]?.id||'');},[accounts,accountId]);const subs=useMemo(()=>categories.filter(c=>c.parentId===categoryId),[categories]);
+function nextDate(
+  f: Frequency,
+  day: number,
+  base = new Date()
+): Date {
+  const d = new Date(base);
+
+  if (f === 'WEEKLY') {
+    return addWeeks(d, 1);
+  }
+
+  if (f === 'BIWEEKLY') {
+    return addWeeks(d, 2);
+  }
+
+  if (f === 'QUARTERLY') {
+    return addMonths(d, 3);
+  }
+
+  if (f === 'YEARLY') {
+    return addYears(d, 1);
+  }
+
+  // MONTHLY
+  const currentYear = d.getFullYear();
+  const currentMonth = d.getMonth();
+
+  const lastDayOfCurrentMonth = new Date(
+    currentYear,
+    currentMonth + 1,
+    0
+  ).getDate();
+
+  const currentDueDate = new Date(
+    currentYear,
+    currentMonth,
+    Math.min(day, lastDayOfCurrentMonth)
+  );
+
+  // If this month's occurrence hasn't happened yet,
+  // use this month.
+  if (currentDueDate >= base) {
+    return currentDueDate;
+  }
+
+  // Otherwise, use next month.
+  const nextMonth = addMonths(
+    new Date(currentYear, currentMonth, 1),
+    1
+  );
+
+  const lastDayOfNextMonth = new Date(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth() + 1,
+    0
+  ).getDate();
+
+  return new Date(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth(),
+    Math.min(day, lastDayOfNextMonth)
+  );
+}export default function Recurring(){const rules=useRecurringRules();const accounts=useAccounts();const categories=useCategories();const [open,setOpen]=useState(false);const [editing,setEditing]=useState<RecurringRule|null>(null);const [name,setName]=useState('');const [amount,setAmount]=useState('');const [frequency,setFrequency]=useState<Frequency>('MONTHLY');const [day,setDay]=useState('1');const [accountId,setAccountId]=useState('');const [categoryId,setCategoryId]=useState('');const [subcategoryId,setSubcategoryId]=useState('');useEffect(()=>{if(!accountId)setAccountId(accounts.find(a=>a.isDefault)?.id||accounts[0]?.id||'');},[accounts,accountId]);const subs=useMemo(()=>categories.filter(c=>c.parentId===categoryId),[categories]);
  function reset(){setEditing(null);setName('');setAmount('');setFrequency('MONTHLY');setDay('1');setCategoryId('');setSubcategoryId('');setOpen(false);}
  function edit(r:RecurringRule){setEditing(r);setName(r.name);setAmount(String(r.amount));setFrequency(r.frequency);setDay(String(r.dayOfMonth||1));setAccountId(r.accountId);setCategoryId(r.categoryId||'');setSubcategoryId(r.subcategoryId||'');setOpen(true);}
  async function save(){if(!name.trim()||!Number(amount)||!accountId)return;const now=new Date();const d=editing?new Date(editing.nextDueDate):nextDate(frequency,Number(day),now);const rule:RecurringRule={id:editing?.id||newId('rule'),name:name.trim(),amount:Number(amount),type:editing?.type||'EXPENSE',accountId,categoryId:categoryId||undefined,subcategoryId:subcategoryId||undefined,frequency,dayOfMonth:Number(day),startDate:editing?.startDate||now.toISOString(),nextDueDate:d.toISOString(),active:true,merchant:editing?.merchant,notes:editing?.notes,lastGeneratedDate:editing?.lastGeneratedDate,createdAt:editing?.createdAt||now.toISOString(),updatedAt:now.toISOString()};await db.recurringRules.put(rule);await queueEntitySync('RECURRING_RULE',rule.id,editing?'UPDATE':'CREATE',rule);reset();}
