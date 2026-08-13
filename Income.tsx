@@ -1,0 +1,6 @@
+import { useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useCategories, useTransactions, useAccounts } from '../hooks/useDb';
+import { formatCurrency } from '../utils/format';
+import TransactionList from '../components/TransactionList';
+export default function Income(){const navigate=useNavigate();const txns=useTransactions()??[];const accounts=useAccounts()??[];const cats=useCategories()??[];const rows=useMemo(()=>txns.filter(t=>t.type==='INCOME').sort((a,b)=>+new Date(b.transactionDateTime)-+new Date(a.transactionDateTime)),[txns]);const total=rows.reduce((s,t)=>s+t.amount,0);return <div className="page-stack"><section><span className="eyebrow">Cash inflow</span><h1>Income</h1><p className="muted">Salary, bonus, freelance, interest, dividends, refunds and other income.</p></section><section className="metric-grid"><div className="metric-card"><span>All-time recorded income</span><strong>{formatCurrency(total)}</strong></div></section><section className="panel"><div className="panel-header"><div><h2>Income transactions</h2><p>Income is part of the normal transaction ledger.</p></div></div><TransactionList transactions={rows} accounts={accounts} categories={cats} onSelect={t=>navigate(`/transactions/${t.id}`)}/></section></div>}
