@@ -19,7 +19,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-
+    env:
+      VITE_BUILD_NUMBER: ${{ github.run_number }}
+      VITE_COMMIT_SHA: ${{ github.sha }}
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
