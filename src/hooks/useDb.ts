@@ -1,11 +1,13 @@
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '../db/database';
-
-export function useTransactions() { return useLiveQuery(() => db.transactions.filter(t => !t.deletedAt).toArray(), [], []); }
-export function useAccounts() { return useLiveQuery(() => db.accounts.filter(a => a.active).toArray(), [], []); }
-export function useCategories() { return useLiveQuery(() => db.categories.filter(c => c.active).sortBy('sortOrder'), [], []); }
-export function useReviewQueue() { return useLiveQuery(() => db.reviewQueue.where('status').equals('PENDING').toArray(), [], []); }
-export function useRecurringRules() { return useLiveQuery(() => db.recurringRules.toArray(), [], []); }
-export function useBudgets() { return useLiveQuery(() => db.budgets.toArray(), [], []); }
-export function useInvestments() { return useLiveQuery(() => db.investments.orderBy('date').reverse().toArray(), [], []); }
-export function useSettings() { return useLiveQuery(() => db.settings.get('app'), []); }
+export const useTransactions=()=>useLiveQuery(()=>db.transactions.filter(t=>!t.deletedAt).toArray(),[],[]);
+export const useAccounts=()=>useLiveQuery(()=>db.accounts.filter(a=>a.active).toArray(),[],[]);
+export const useCategories=()=>useLiveQuery(()=>db.categories.filter(c=>c.active).sortBy('sortOrder'),[],[]);
+export const useReviewQueue=()=>useLiveQuery(()=>db.reviewQueue.where('status').equals('PENDING').toArray(),[],[]);
+export const useRecurringRules=()=>useLiveQuery(()=>db.recurringRules.toArray(),[],[]);
+export const useBudgets=()=>useLiveQuery(()=>db.budgets.toArray(),[],[]);
+export const useInvestments=()=>useLiveQuery(()=>db.investments.orderBy('date').reverse().toArray(),[],[]);
+export const useInterestAccounts=()=>useLiveQuery(()=>db.interestAccounts.filter(x=>x.active).toArray(),[],[]);
+export const useProjectedIncome=()=>useLiveQuery(()=>db.projectedIncomeEvents.toArray(),[],[]);
+export const useSavedReports=()=>useLiveQuery(()=>db.savedReports.orderBy('updatedAt').reverse().toArray(),[],[]);
+export const useSettings=()=>useLiveQuery(()=>db.settings.get('app'),[]);

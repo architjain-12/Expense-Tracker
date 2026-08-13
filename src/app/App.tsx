@@ -14,13 +14,17 @@ import Recurring from '../pages/Recurring';
 import Categories from '../pages/Categories';
 import Budgets from '../pages/Budgets';
 import Investments from '../pages/Investments';
+import Income from '../pages/Income';
+import InterestReturns from '../pages/InterestReturns';
 import TransactionDetail from '../pages/TransactionDetail';
 import EditTransaction from '../pages/EditTransaction';
 import { ensureSeedData } from '../db/seed';
 import { processDueRecurringTransactions } from '../services/recurringService';
 import { restoreFromGoogleSheetsIfEmpty } from '../services/googleSheetsService';
+import { db } from '../db/database';
+import { recordDueInterest } from '../services/interestService';
 
-function Bootstrap(){useEffect(()=>{const run=async()=>{await ensureSeedData();await processDueRecurringTransactions();await restoreFromGoogleSheetsIfEmpty();};void run();},[]);return null;}
+function Bootstrap(){useEffect(()=>{const run=async()=>{await ensureSeedData();const s=await db.settings.get('app');if(s)document.documentElement.dataset.theme=s.theme||'dark';await processDueRecurringTransactions();await recordDueInterest();await restoreFromGoogleSheetsIfEmpty();};void run();},[]);return null;}
 
 export default function App(){return <BrowserRouter basename={import.meta.env.BASE_URL}>
     <Bootstrap/>
@@ -38,7 +42,7 @@ export default function App(){return <BrowserRouter basename={import.meta.env.BA
                 <Route path="/reports" element={<Stats/>}/>
                 <Route path="/categories" element={<Categories/>}/>
                 <Route path="/budgets" element={<Budgets/>}/>
-                <Route path="/investments" element={<Investments/>}/>
+                <Route path="/investments" element={<Investments/>}/><Route path="/income" element={<Income/>}/><Route path="/interest" element={<InterestReturns/>}/>
                 <Route path="/recurring" element={<Recurring/>}/>
                 <Route path="/options" element={<Options/>}/>
                 <Route path="/settings" element={<Settings/>}/>

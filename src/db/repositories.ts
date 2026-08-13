@@ -1,40 +1,14 @@
 import { db } from './database';
-import type { Account, AppSettings, Budget, Category, InvestmentEntry, RecurringRule, ReviewQueueItem, Transaction } from '../types/models';
-
-export const transactionRepository = {
-  list: () => db.transactions.filter(t => !t.deletedAt).toArray(),
-  byId: (id: string) => db.transactions.get(id),
-  put: (transaction: Transaction) => db.transactions.put(transaction),
-  delete: (id: string) => db.transactions.update(id, { deletedAt: new Date().toISOString(), updatedAt: new Date().toISOString(), syncStatus: 'PENDING' }),
-};
-export const accountRepository = {
-  list: () => db.accounts.filter(a => a.active).toArray(),
-  put: (account: Account) => db.accounts.put(account),
-};
-export const categoryRepository = {
-  list: () => db.categories.filter(c => c.active).sortBy('sortOrder'),
-  put: (category: Category) => db.categories.put(category),
-  deactivate: (id: string) => db.categories.update(id, { active: false, updatedAt: new Date().toISOString() }),
-};
-export const recurringRepository = {
-  list: () => db.recurringRules.filter(r => r.active).toArray(),
-  put: (rule: RecurringRule) => db.recurringRules.put(rule),
-  remove: (id: string) => db.recurringRules.update(id, { active: false, updatedAt: new Date().toISOString() }),
-};
-export const budgetRepository = {
-  list: () => db.budgets.toArray(),
-  put: (budget: Budget) => db.budgets.put(budget),
-  remove: (id: string) => db.budgets.delete(id),
-};
-export const investmentRepository = {
-  list: () => db.investments.orderBy('date').reverse().toArray(),
-  put: (entry: InvestmentEntry) => db.investments.put(entry),
-};
-export const reviewRepository = {
-  pending: () => db.reviewQueue.where('status').equals('PENDING').toArray(),
-  put: (item: ReviewQueueItem) => db.reviewQueue.put(item),
-};
-export const settingsRepository = {
-  get: () => db.settings.get('app'),
-  put: (settings: AppSettings) => db.settings.put(settings),
-};
+import type { Account, AppSettings, Budget, Category, InterestAccount, InvestmentEntry, ProjectedIncomeEvent, RecurringRule, ReviewQueueItem, SavedReport, Transaction } from '../types/models';
+const stamp=()=>new Date().toISOString();
+export const transactionRepository={list:()=>db.transactions.filter(t=>!t.deletedAt).toArray(),byId:(id:string)=>db.transactions.get(id),put:(t:Transaction)=>db.transactions.put(t),delete:(id:string)=>db.transactions.update(id,{deletedAt:stamp(),updatedAt:stamp(),syncStatus:'PENDING'})};
+export const accountRepository={list:()=>db.accounts.filter(a=>a.active).toArray(),put:(a:Account)=>db.accounts.put(a),remove:(id:string)=>db.accounts.update(id,{active:false,updatedAt:stamp()})};
+export const categoryRepository={list:()=>db.categories.filter(c=>c.active).sortBy('sortOrder'),put:(c:Category)=>db.categories.put(c),deactivate:(id:string)=>db.categories.update(id,{active:false,updatedAt:stamp()})};
+export const recurringRepository={list:()=>db.recurringRules.toArray(),put:(r:RecurringRule)=>db.recurringRules.put(r),remove:(id:string)=>db.recurringRules.update(id,{active:false,updatedAt:stamp()})};
+export const budgetRepository={list:()=>db.budgets.toArray(),put:(b:Budget)=>db.budgets.put(b),remove:(id:string)=>db.budgets.delete(id)};
+export const investmentRepository={list:()=>db.investments.orderBy('date').reverse().toArray(),put:(e:InvestmentEntry)=>db.investments.put(e)};
+export const interestRepository={list:()=>db.interestAccounts.toArray(),put:(e:InterestAccount)=>db.interestAccounts.put(e),remove:(id:string)=>db.interestAccounts.update(id,{active:false,updatedAt:stamp()})};
+export const projectedIncomeRepository={list:()=>db.projectedIncomeEvents.toArray(),put:(e:ProjectedIncomeEvent)=>db.projectedIncomeEvents.put(e)};
+export const savedReportRepository={list:()=>db.savedReports.orderBy('updatedAt').reverse().toArray(),put:(r:SavedReport)=>db.savedReports.put(r),remove:(id:string)=>db.savedReports.delete(id)};
+export const reviewRepository={pending:()=>db.reviewQueue.where('status').equals('PENDING').toArray(),put:(i:ReviewQueueItem)=>db.reviewQueue.put(i)};
+export const settingsRepository={get:()=>db.settings.get('app'),put:(s:AppSettings)=>db.settings.put(s)};

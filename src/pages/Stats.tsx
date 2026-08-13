@@ -1,326 +1,49 @@
 import { useMemo, useState } from 'react';
-import { BarChart3, CalendarDays, PieChart as PieIcon } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import { useAccounts, useCategories, useTransactions } from '../hooks/useDb';
+import { useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Save, Trash2, X } from 'lucide-react';
+import { Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis, Cell, CartesianGrid } from 'recharts';
+import { useAccounts, useCategories, useSavedReports, useTransactions } from '../hooks/useDb';
+import { db } from '../db/database';
+import { newId } from '../utils/id';
 import { formatCurrency } from '../utils/format';
-import { endOfMonth, parseISO, startOfMonth } from 'date-fns';
+import { addMonths, endOfMonth, format, startOfMonth } from 'date-fns';
+import type { SavedReport, TransactionType } from '../types/models';
 
-const PIE_COLORS = ['#7c8cff', '#5dd39e', '#f2c14e', '#e17878', '#7fc8f8', '#c39be8'];
-
-function getSafeDate(value: string | undefined): Date | null {
-  if (!value) return null;
-
-  try {
-    const parsed = parseISO(value);
-    return Number.isNaN(parsed.getTime()) ? null : parsed;
-  } catch {
-    return null;
-  }
-}
-
-export default function Stats() {
-  const transactions = useTransactions() ?? [];
-  const categories = useCategories() ?? [];
-  const accounts = useAccounts() ?? [];
-  const navigate = useNavigate();
-  const [params, setParams] = useSearchParams();
-
-  const initialMonth = params.get('month') || new Date().toISOString().slice(0, 7);
-
-  const [month, setMonth] = useState(initialMonth);
-  const [category, setCategory] = useState(params.get('category') || '');
-  const [subcategory, setSubcategory] = useState(params.get('subcategory') || '');
-  const [account, setAccount] = useState(params.get('account') || '');
-
-  const roots = useMemo(
-    () => categories.filter((c) => !c.parentId),
-    [categories]
-  );
-
-  const subs = useMemo(
-    () => categories.filter((c) => c.parentId === category),
-    [categories, category]
-  );
-
-  const rows = useMemo(() => {
-    const [year, monthNumber] = month.split('-').map(Number);
-
-    if (!Number.isFinite(year) || !Number.isFinite(monthNumber)) {
-      return [];
-    }
-
-    const start = startOfMonth(new Date(year, monthNumber - 1, 1));
-    const end = endOfMonth(start);
-
-    return transactions.filter((transaction) => {
-      if (transaction.type !== 'EXPENSE') return false;
-
-      const date = getSafeDate(transaction.transactionDateTime);
-      if (!date) return false;
-
-      return (
-        date >= start &&
-        date <= end &&
-        (!category || transaction.categoryId === category) &&
-        (!subcategory || transaction.subcategoryId === subcategory) &&
-        (!account || transaction.accountId === account)
-      );
-    });
-  }, [transactions, month, category, subcategory, account]);
-
-  const filteredSpend = useMemo(
-    () => rows.reduce((sum, transaction) => sum + Number(transaction.amount || 0), 0),
-    [rows]
-  );
-
-  const averageSpend = rows.length ? filteredSpend / rows.length : 0;
-
-  const byCategory = useMemo(() => {
-    const map = new Map<string, number>();
-
-    for (const transaction of rows) {
-      const id = transaction.categoryId || 'uncategorized';
-      map.set(id, (map.get(id) || 0) + Number(transaction.amount || 0));
-    }
-
-    return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, amount]) => ({
-        id,
-        name: categories.find((c) => c.id === id)?.name || 'Uncategorized',
-        amount,
-      }));
-  }, [rows, categories]);
-
-  const byAccount = useMemo(() => {
-    const map = new Map<string, number>();
-
-    for (const transaction of rows) {
-      map.set(
-        transaction.accountId,
-        (map.get(transaction.accountId) || 0) + Number(transaction.amount || 0)
-      );
-    }
-
-    return [...map.entries()]
-      .map(([id, amount]) => ({
-        id,
-        name: accounts.find((accountItem) => accountItem.id === id)?.name || 'Unknown',
-        amount,
-      }))
-      .sort((a, b) => b.amount - a.amount);
-  }, [rows, accounts]);
-
-  function applyFilters() {
-    const next = new URLSearchParams();
-    next.set('month', month);
-    if (category) next.set('category', category);
-    if (subcategory) next.set('subcategory', subcategory);
-    if (account) next.set('account', account);
-    setParams(next);
-  }
-
-  function openCategory(categoryId: string) {
-    navigate(`/transactions?month=${month}&category=${encodeURIComponent(categoryId)}`);
-  }
-
-  return (
-    <div className="page-stack">
-      <section className="hero-row">
-        <div>
-          <span className="eyebrow">Stats</span>
-          <h1>Spending statistics</h1>
-          <p className="muted">
-            Filter by month, category, subcategory and account.
-          </p>
-        </div>
-      </section>
-
-      <div className="toolbar stat-filters">
-        <label className="tool-field">
-          <CalendarDays size={16} />
-          <input
-            type="month"
-            value={month}
-            onChange={(event) => setMonth(event.target.value)}
-          />
-        </label>
-
-        <select
-          value={category}
-          onChange={(event) => {
-            setCategory(event.target.value);
-            setSubcategory('');
-          }}
-        >
-          <option value="">All categories</option>
-          {roots.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-
-        <select
-          value={subcategory}
-          disabled={!category}
-          onChange={(event) => setSubcategory(event.target.value)}
-        >
-          <option value="">All subcategories</option>
-          {subs.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-
-        <select value={account} onChange={(event) => setAccount(event.target.value)}>
-          <option value="">All accounts</option>
-          {accounts.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-
-        <button className="secondary-btn" onClick={applyFilters}>
-          Apply
-        </button>
-      </div>
-
-      <section className="metric-grid">
-        <div className="metric-card">
-          <span>Filtered spend</span>
-          <strong>{formatCurrency(filteredSpend)}</strong>
-          <small>{rows.length} transactions</small>
-        </div>
-
-        <div className="metric-card">
-          <span>Average</span>
-          <strong>{formatCurrency(averageSpend)}</strong>
-          <small>Per transaction</small>
-        </div>
-      </section>
-
-      <div className="report-grid">
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>Category spend</h2>
-              <p>Tap a category to drill into transactions.</p>
-            </div>
-            <PieIcon size={18} />
-          </div>
-
-          {byCategory.length === 0 ? (
-            <div className="empty-state" style={{ margin: 18 }}>
-              <h3>No spending found</h3>
-              <p>Try another month or remove the filters.</p>
-            </div>
-          ) : (
-            <>
-              <div className="chart-box">
-                <ResponsiveContainer width="100%" height={300}>
-                  <PieChart>
-                    <Pie
-                      data={byCategory}
-                      dataKey="amount"
-                      nameKey="name"
-                      innerRadius="48%"
-                      outerRadius="78%"
-                      onClick={(_, index) => {
-                        const selected = byCategory[index];
-                        if (selected) openCategory(selected.id);
-                      }}
-                    >
-                      {byCategory.map((entry, index) => (
-                        <Cell
-                          key={entry.id}
-                          fill={PIE_COLORS[index % PIE_COLORS.length]}
-                        />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      formatter={(value) => [
-                        formatCurrency(Number(value)),
-                        'Spend',
-                      ]}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="stacked-list">
-                {byCategory.map((item) => (
-                  <button
-                    className="stat-row clickable"
-                    key={item.id}
-                    onClick={() => openCategory(item.id)}
-                  >
-                    <span>{item.name}</span>
-                    <strong>{formatCurrency(item.amount)}</strong>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </section>
-
-        <section className="panel">
-          <div className="panel-header">
-            <div>
-              <h2>By account</h2>
-              <p>Filtered spending by account.</p>
-            </div>
-            <BarChart3 size={18} />
-          </div>
-
-          {byAccount.length === 0 ? (
-            <div className="empty-state" style={{ margin: 18 }}>
-              <h3>No account spending found</h3>
-              <p>Try another month or remove the filters.</p>
-            </div>
-          ) : (
-            <div className="chart-box">
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={byAccount} layout="vertical">
-                  <CartesianGrid stroke="#252a32" horizontal={false} />
-                  <XAxis type="number" stroke="#78808e" />
-                  <YAxis
-                    type="category"
-                    dataKey="name"
-                    width={100}
-                    stroke="#78808e"
-                  />
-                  <Tooltip
-                    formatter={(value) => [
-                      formatCurrency(Number(value)),
-                      'Spend',
-                    ]}
-                  />
-                  <Bar
-                    dataKey="amount"
-                    fill="#7c8cff"
-                    radius={[0, 6, 6, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </section>
-      </div>
-    </div>
-  );
+const COLORS=['#5f72ff','#4fd39a','#f2bd5c','#e37b7b','#72c9ef','#bb8be8','#e88ab7','#8b9aa8'];
+const monthKey=(d:Date)=>format(d,'yyyy-MM');
+export default function Stats(){
+  const tx=useTransactions()??[], categories=useCategories()??[], accounts=useAccounts()??[], saved=useSavedReports()??[]; const [params]=useSearchParams();
+  const [mode,setMode]=useState<'MONTH'|'YEAR'>('MONTH'); const [period,setPeriod]=useState(new Date()); const [filtersOpen,setFiltersOpen]=useState(false);
+  const [catIds,setCatIds]=useState<string[]>(()=>params.get('category')?[params.get('category')!]:[]),[subIds,setSubIds]=useState<string[]>(()=>params.get('subcategory')?[params.get('subcategory')!]:[]),[accountIds,setAccountIds]=useState<string[]>(()=>params.get('account')?[params.get('account')!]:[]),[reportName,setReportName]=useState('');
+  const roots=useMemo(()=>categories.filter(c=>!c.parentId),[categories]);
+  const children=useMemo(()=>categories.filter(c=>!!c.parentId),[categories]);
+  const toggle=(arr:string[],id:string,set:(v:string[])=>void)=>set(arr.includes(id)?arr.filter(x=>x!==id):[...arr,id]);
+  const filtered=useMemo(()=>tx.filter(t=>{if(t.type!=='EXPENSE')return false;const d=new Date(t.transactionDateTime);const inPeriod=mode==='MONTH'?d>=startOfMonth(period)&&d<=endOfMonth(period):d.getFullYear()===period.getFullYear();if(!inPeriod)return false;if(catIds.length&&!catIds.includes(t.categoryId||''))return false;if(subIds.length&&!subIds.includes(t.subcategoryId||''))return false;if(accountIds.length&&!accountIds.includes(t.accountId))return false;return true;}),[tx,period,mode,catIds,subIds,accountIds]);
+  const total=filtered.reduce((s,t)=>s+t.amount,0); const average=filtered.length?total/filtered.length:0;
+  const byCategory=useMemo(()=>{const m=new Map<string,number>();filtered.forEach(t=>m.set(t.categoryId||'uncategorized',(m.get(t.categoryId||'uncategorized')||0)+t.amount));return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([id,amount])=>({id,name:categories.find(c=>c.id===id)?.name||'Uncategorized',amount}));},[filtered,categories]);
+  const bySubcategory=useMemo(()=>{const m=new Map<string,number>();filtered.forEach(t=>m.set(t.subcategoryId||'uncategorized',(m.get(t.subcategoryId||'uncategorized')||0)+t.amount));return [...m.entries()].sort((a,b)=>b[1]-a[1]).map(([id,amount])=>({id,name:categories.find(c=>c.id===id)?.name||'Uncategorized',amount}));},[filtered,categories]);
+  const trend=useMemo(()=>{if(mode==='YEAR'){return Array.from({length:12},(_,i)=>{const d=new Date(period.getFullYear(),i,1);const value=tx.filter(t=>t.type==='EXPENSE').filter(t=>{const td=new Date(t.transactionDateTime);return td>=startOfMonth(d)&&td<=endOfMonth(d);}).filter(t=>!catIds.length||catIds.includes(t.categoryId||'')).filter(t=>!subIds.length||subIds.includes(t.subcategoryId||'')).filter(t=>!accountIds.length||accountIds.includes(t.accountId)).reduce((s,t)=>s+t.amount,0);return {label:format(d,'MMM'),amount:value};});}return Array.from({length:31},(_,i)=>{const d=new Date(period.getFullYear(),period.getMonth(),i+1);if(d.getMonth()!==period.getMonth())return {label:String(i+1),amount:0};const value=filtered.filter(t=>new Date(t.transactionDateTime).getDate()===i+1).reduce((s,t)=>s+t.amount,0);return {label:String(i+1),amount:value};});},[tx,mode,period,filtered,catIds,subIds,accountIds]);
+  const subTrend=(subcategoryId:string)=>Array.from({length:12},(_,i)=>{const d=new Date(period.getFullYear(),i,1);const amount=tx.filter(t=>t.type==='EXPENSE'&&t.subcategoryId===subcategoryId).filter(t=>{const td=new Date(t.transactionDateTime);return td>=startOfMonth(d)&&td<=endOfMonth(d);}).reduce((s,t)=>s+t.amount,0);return {label:format(d,'MMM'),amount};});
+  const [selectedSub,setSelectedSub]=useState<string>('');
+  const clear=()=>{setCatIds([]);setSubIds([]);setAccountIds([]);};
+  const saveReport=async()=>{if(!reportName.trim())return;const now=new Date().toISOString();const r:SavedReport={id:newId('report'),name:reportName.trim(),categoryIds:catIds,subcategoryIds:subIds,accountIds,transactionTypes:['EXPENSE'],createdAt:now,updatedAt:now};await db.savedReports.put(r);setReportName('');};
+  const loadReport=(r:SavedReport)=>{setCatIds(r.categoryIds);setSubIds(r.subcategoryIds);setAccountIds(r.accountIds);setFiltersOpen(true);};
+  const removeSaved=async(id:string)=>db.savedReports.delete(id);
+  const shift=(n:number)=>setPeriod(p=>addMonths(p,mode==='YEAR'?n*12:n));
+  return <div className="page-stack">
+    <section className="hero-row"><div><span className="eyebrow">Reporting</span><h1>Stats</h1><p className="muted">Build reusable reports from categories, subcategories and accounts.</p></div></section>
+    <section className="period-switch"><button className={mode==='MONTH'?'active':''} onClick={()=>setMode('MONTH')}>Monthly</button><button className={mode==='YEAR'?'active':''} onClick={()=>setMode('YEAR')}>Yearly</button></section>
+    <div className="month-nav"><button className="icon-btn" onClick={()=>shift(-1)}><ChevronLeft/></button><strong>{mode==='YEAR'?format(period,'yyyy'):format(period,'MMMM yyyy')}</strong><button className="icon-btn" onClick={()=>shift(1)}><ChevronRight/></button></div>
+    <section className="panel filter-panel"><button className="filter-toggle" onClick={()=>setFiltersOpen(v=>!v)}><span>Filters {catIds.length+subIds.length+accountIds.length?`· ${catIds.length+subIds.length+accountIds.length} selected`:''}</span>{filtersOpen?<ChevronUp size={17}/>:<ChevronDown size={17}/>}</button>{filtersOpen&&<div className="stats-filter-body">
+      <div><span className="filter-label">Categories</span><div className="multi-options">{roots.map(c=><button key={c.id} className={catIds.includes(c.id)?'selected':''} onClick={()=>toggle(catIds,c.id,setCatIds)}>{c.name}</button>)}</div></div>
+      <div><span className="filter-label">Subcategories</span><div className="multi-options">{children.map(c=><button key={c.id} className={subIds.includes(c.id)?'selected':''} onClick={()=>toggle(subIds,c.id,setSubIds)}>{c.name}</button>)}</div></div>
+      <div><span className="filter-label">Accounts</span><div className="multi-options">{accounts.map(a=><button key={a.id} className={accountIds.includes(a.id)?'selected':''} onClick={()=>toggle(accountIds,a.id,setAccountIds)}>{a.name}</button>)}</div></div>
+      <div className="filter-actions"><button className="secondary-btn" onClick={clear}><X size={14}/> Clear filters</button><input value={reportName} onChange={e=>setReportName(e.target.value)} placeholder="Report name"/><button className="primary-btn" disabled={!reportName.trim()} onClick={saveReport}><Save size={15}/> Save report</button></div>
+    </div>}</section>
+    {saved.length>0&&<section className="panel"><div className="panel-header"><div><h2>Saved reports</h2><p>One tap restores your custom reporting filter.</p></div></div><div className="saved-reports">{saved.map(r=><div className="saved-report" key={r.id}><button onClick={()=>loadReport(r)}>{r.name}</button><button className="icon-btn small danger-icon" onClick={()=>void removeSaved(r.id)}><Trash2 size={13}/></button></div>)}</div></section>}
+    <section className="metric-grid"><div className="metric-card"><span>Filtered spend</span><strong>{formatCurrency(total)}</strong><small>{filtered.length} transactions</small></div><div className="metric-card"><span>Average</span><strong>{formatCurrency(average)}</strong><small>Per transaction</small></div></section>
+    <section className="panel"><div className="panel-header"><div><h2>Category spend</h2><p>Tap values below the chart to filter subcategories.</p></div></div>{byCategory.length?<><div className="chart-box"><ResponsiveContainer width="100%" height={280}><PieChart><Pie data={byCategory} dataKey="amount" nameKey="name" innerRadius="48%" outerRadius="76%">{byCategory.map((x,i)=><Cell key={x.id} fill={COLORS[i%COLORS.length]}/>)}</Pie><Tooltip formatter={(v)=>formatCurrency(Number(v))}/></PieChart></ResponsiveContainer></div><div className="stacked-list">{byCategory.map((x,i)=><button className="stat-row clickable" key={x.id} onClick={()=>{setCatIds([x.id]);setFiltersOpen(true);}}><span><i className="legend-dot" style={{background:COLORS[i%COLORS.length]}}/> {x.name}</span><strong>{formatCurrency(x.amount)}</strong></button>)}</div></>:<div className="empty-state"><h3>No spending found</h3><p>Adjust the period or clear filters.</p></div>}</section>
+    <section className="panel"><div className="panel-header"><div><h2>{mode==='YEAR'?'Monthly trend':'Daily trend'}</h2><p>{mode==='YEAR'?'All months in the selected year':'Current month accumulation'}</p></div></div><div className="chart-box"><ResponsiveContainer width="100%" height={280}><LineChart data={trend}><CartesianGrid stroke="#252a32" vertical={false}/><XAxis dataKey="label" stroke="#78808e"/><YAxis stroke="#78808e" tickFormatter={v=>`₹${Math.round(Number(v)/1000)}k`}/><Tooltip formatter={v=>[formatCurrency(Number(v)),'Spend']}/><Line type="monotone" dataKey="amount" stroke="#6d7dff" strokeWidth={3} dot={false}/></LineChart></ResponsiveContainer></div></section>
+    <section className="panel"><div className="panel-header"><div><h2>Subcategory drill-down</h2><p>Tap a subcategory to see its full-year monthly trend.</p></div></div><div className="stacked-list">{bySubcategory.map(x=><button className="stat-row clickable" key={x.id} onClick={()=>setSelectedSub(x.id)}><span>{x.name}</span><strong>{formatCurrency(x.amount)}</strong></button>)}</div>{selectedSub&&<div className="subtrend"><h3>{categories.find(c=>c.id===selectedSub)?.name||'Subcategory'} — yearly trend</h3><ResponsiveContainer width="100%" height={250}><LineChart data={subTrend(selectedSub)}><CartesianGrid stroke="#252a32" vertical={false}/><XAxis dataKey="label" stroke="#78808e"/><YAxis stroke="#78808e"/><Tooltip formatter={v=>[formatCurrency(Number(v)),'Spend']}/><Line type="monotone" dataKey="amount" stroke="#4fd39a" strokeWidth={3} dot={false}/></LineChart></ResponsiveContainer></div>}</section>
+  </div>;
 }

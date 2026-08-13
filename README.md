@@ -1,171 +1,85 @@
 # Expense Tracker PWA
 
-A dark, mobile-first personal expense tracker designed for iPhone Safari/Chrome and responsive desktop use.
+A mobile-first, local-first personal finance web app built with React + TypeScript + IndexedDB (Dexie). Google Sheets is an optional reporting/backup layer.
 
-## Final architecture
-
-```text
-React PWA
-   ↓
-Dexie / IndexedDB  ← primary local database
-   ├── Transactions
-   ├── Categories / Subcategories
-   ├── Accounts
-   ├── Review Queue
-   ├── Recurring Rules
-   ├── Budgets
-   ├── Investments
-   └── Settings
-
-Optional sync/reporting:
-IndexedDB → Google Apps Script → private Google Sheets
-
-Automation:
-iOS Shortcut → iCloud NDJSON → Sync Automation → Review Queue
-```
-
-The application does not require a running Spring Boot server or hosted database for daily use.
-
-## What is implemented
-
-- Transaction-first Home screen
-- Fast expense/income entry with current date/time
-- Default account selection that waits for IndexedDB to load correctly
-- Full category + optional subcategory hierarchy
-- Category/subcategory customization and archiving
-- Frequently used categories first
-- Merchant and note suggestions (top five historical matches)
-- Current-month transaction screen by default
-- Month switching
-- Filtering by category, subcategory and account
-- Dedicated Stats screen with filtered charts
-- Clickable Home category pie chart → filtered transaction view
-- Review Queue for iOS Shortcut automation
-- NDJSON automation importer with duplicate protection
-- Recurring subscriptions / EMI / RD / rent and other scheduled transactions
-- Recurring transaction `↻` UI indicator
-- Investment activity tracking
-- Optional budgets
-- Daily/monthly/category/account analytics
-- JSON backup/restore
-- Google Sheets sync and smart restore
-- Empty-local-database recovery prompt
-- Local device lock with PIN or WebAuthn/passkey where supported
-- Responsive dark mobile-web and desktop UI
-- GitHub Pages deployment workflow
-
-## Important privacy model
-
-The public GitHub Pages site contains application code only. Personal transaction data and runtime Google Sheets configuration are stored locally in IndexedDB.
-
-A local device lock can prevent accidental entry on a device, including passkey/device authentication where supported.
-
-The passkey feature is a **local device lock**, not a server-backed identity system. Full account authentication would require a trusted server to verify WebAuthn assertions.
-
-## React beginner guide
-
-Read these files in order:
-
-1. `docs/CODE-FLOW.md`
-2. `docs/ARCHITECTURE.md`
-3. `docs/SETUP.md`
-
-The essential flow is:
+## Architecture
 
 ```text
-Button / form
-    ↓
-React page
-    ↓
-Service
-    ↓
-Dexie repository/database
-    ↓
-IndexedDB
-    ↓
-useLiveQuery
-    ↓
-React rerenders
+React UI
+  ↓
+Application/services
+  ↓
+IndexedDB (Dexie) — local source of truth
+  ├── Transactions
+  ├── Accounts
+  ├── Categories/Subcategories
+  ├── Budgets
+  ├── Recurring rules
+  ├── Investments
+  ├── Interest accounts + projected income
+  └── Saved reports
+       ↓ optional
+Google Apps Script → Google Sheets
+
+Future:
+React → repository/data provider → Spring Boot → PostgreSQL
 ```
 
-For example:
+## Main features
 
-```text
-AddTransaction.tsx
-    ↓
-createTransaction()
-    ↓
-db.transactions.put()
-    ↓
-IndexedDB
-    ↓
-useTransactions()
-    ↓
-TransactionList
-```
+- Fast transaction recording from the bottom `+` button.
+- Current-month transaction ledger with arrow month navigation, filters and date grouping.
+- Categories and optional subcategories, including quick creation from Add Transaction.
+- Default account and classification defaults.
+- Recurring payments with edit/delete, multiple frequencies and automatic-entry markers.
+- Budget progress and estimated recurring dues on Home.
+- Investments shown in the main ledger plus investment reporting.
+- Income reporting including recorded interest income.
+- Stats with monthly/yearly modes, vertical pie/line charts, multi-select filters and saved reports.
+- FD/RD/savings interest calculator and projected interest income for planning.
+- Face ID/WebAuthn or PIN local app lock.
+- Light/dark/system theme.
+- JSON restore backup plus CSV and Excel-compatible `.xls` reporting export.
+- Clear/reset IndexedDB from Settings.
+- Optional Google Sheets sync/restore.
 
-## Setup
+## Local development
 
 ```bash
-npm install
+npm ci
 npm run dev
 ```
 
-Then open the URL printed by Vite.
+Open the Vite URL shown in the terminal.
 
-Production build:
+Build:
 
 ```bash
 npm run build
 ```
 
-## Google Sheets
+If npm reports a missing native optional dependency after moving `node_modules` between machines, delete `node_modules` and run `npm ci` again.
 
-The React source never contains the personal Apps Script URL/token.
+## Google Sheets setup
 
-Configure them at runtime under:
+1. Create a Google Sheet.
+2. Open **Extensions → Apps Script**.
+3. Copy `google-apps-script/Code.gs` into the Apps Script project.
+4. Set `SHEET_ID` to the ID from the Google Sheet URL.
+5. Set `SYNC_TOKEN` to a long random secret.
+6. Deploy as **Web app**, execute as you, and allow the required access.
+7. Copy the `/exec` URL into the app under **Options → Settings → Google Sheets**.
+8. Enter the same token and press **Save connection**.
+9. Press **Sync** to upload local queued changes or **Fetch from Sheet** to restore data.
 
-```text
-Options → Settings → Google Sheets
-```
+The script creates/uses these sheets automatically:
 
-The Apps Script implementation is under:
+`Transactions`, `Accounts`, `Categories`, `RecurringRules`, `Budgets`, `Investments`, `InterestAccounts`, `ProjectedIncome`, `SavedReports`.
 
-```text
-google-apps-script/Code.gs
-google-apps-script/README.md
-```
+## Data model / future backend
 
-## iOS Shortcut automation
+Do not treat Google Sheets as the transactional database. IndexedDB remains the local source of truth. The app's services/repositories are deliberately kept separate from the UI so a future Spring Boot/PostgreSQL provider can be added without rewriting the screens.
 
-The intended V1 automation path is:
+## Backup note
 
-```text
-Bank notification
-    ↓
-iOS Shortcut
-    ↓
-transaction-queue.ndjson in iCloud Drive
-    ↓
-Expense Tracker → Review → Sync Automation
-    ↓
-Review Queue
-    ↓
-Record / Discard
-```
-
-See the included Shortcut instructions in `docs/SETUP.md` and `docs/MOBILE-MOCKUPS.md`.
-
-
-## Build troubleshooting
-
-The project uses TypeScript declaration packages for React and Node. If a fresh clone reports errors such as `Cannot find a declaration file for module 'react'` or `Cannot find name 'process'`, make sure `npm install` has completed successfully. The project now uses `loadEnv()` in `vite.config.ts` rather than `process.env`.
-
-Run:
-
-```bash
-npm install
-npm run build
-```
-
-Do not use `vite build` alone to bypass TypeScript checks; the intended build is `tsc -b && vite build`.
+JSON is the complete restore format. CSV and Excel-compatible `.xls` are intended for reporting. A browser/PWA cannot reliably wake itself up at an arbitrary time and silently write to iOS Files, so scheduled native backup is intentionally not faked into the web app.

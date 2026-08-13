@@ -1,119 +1,31 @@
-import { useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
-import { DatabaseBackup, Download, FileUp, RefreshCcw, ShieldCheck, Smartphone, Unlock } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { DatabaseBackup, Download, FileUp, RefreshCcw, ShieldCheck, Smartphone, Unlock, Plus, Trash2, Pencil } from 'lucide-react';
 import { db } from '../db/database';
 import { restoreFromGoogleSheets, syncWithGoogleSheets } from '../services/googleSheetsService';
 import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
-
+import { exportCsv, exportExcel, exportJson, clearLocalData } from '../services/exportService';
+import { newId } from '../utils/id';
 export default function Settings(){
-  const settings=useSettings(); const accounts=useAccounts(); const fileRef=useRef<HTMLInputElement>(null); const [message,setMessage]=useState(''); const [pin,setPin]=useState(''); const [sheetUrl,setSheetUrl]=useState(''); const [sheetToken,setSheetToken]=useState('');
-  const [defaultNeedWant,setDefaultNeedWant]=useState(settings?.defaultNeedWant||''); const [defaultED,setDefaultED]=useState(settings?.defaultEssentialDiscretionary||''); const [defaultFV,setDefaultFV]=useState(settings?.defaultFixedVariable||'');
-  async function saveDefaults(){const existing=await db.settings.get('app');if(!existing)return;await db.settings.put({...existing,defaultNeedWant:defaultNeedWant as any||undefined,defaultEssentialDiscretionary:defaultED as any||undefined,defaultFixedVariable:defaultFV as any||undefined});setMessage('Defaults saved locally.');}
-  async function saveSheets(){const existing=await db.settings.get('app');if(!existing)return;await db.settings.put({...existing,googleSheetsEndpoint:sheetUrl||existing.googleSheetsEndpoint,googleSheetsToken:sheetToken||existing.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||existing.googleSheetsEndpoint)});setMessage('Google Sheets connection saved locally.');}
-  async function sync(){const result=await syncWithGoogleSheets();setMessage(result.success?`Synced ${result.processed||0} changes.`:(result.message||'Sync failed.'));}
-  async function restore(){const result=await restoreFromGoogleSheets();setMessage(result.message || `Restored ${result.restored} records.`);}
-  async function exportBackup(){const snapshot={transactions:await db.transactions.toArray(),accounts:await db.accounts.toArray(),categories:await db.categories.toArray(),recurringRules:await db.recurringRules.toArray(),reviewQueue:await db.reviewQueue.toArray(),budgets:await db.budgets.toArray(),investments:await db.investments.toArray(),settings:await db.settings.toArray()};const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=`expense-tracker-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();URL.revokeObjectURL(url);}
-  async function importBackup(file?:File){if(!file)return;try{const data=JSON.parse(await file.text()) as Record<string,unknown[]>;await db.transaction('rw',[db.transactions,db.accounts,db.categories,db.recurringRules,db.reviewQueue,db.budgets,db.investments,db.settings],async()=>{if(data.transactions)await db.transactions.bulkPut(data.transactions as any[]);if(data.accounts)await db.accounts.bulkPut(data.accounts as any[]);if(data.categories)await db.categories.bulkPut(data.categories as any[]);if(data.recurringRules)await db.recurringRules.bulkPut(data.recurringRules as any[]);if(data.reviewQueue)await db.reviewQueue.bulkPut(data.reviewQueue as any[]);if(data.budgets)await db.budgets.bulkPut(data.budgets as any[]);if(data.investments)await db.investments.bulkPut(data.investments as any[]);if(data.settings)await db.settings.bulkPut(data.settings as any[]);});setMessage('Backup restored.');}catch(e){setMessage(e instanceof Error?e.message:'Backup import failed.');}}
-  async function lockPasskey(){try{await enablePasskey();setMessage('Device passkey lock enabled. On supported iPhones this can use Face ID/passkeys.');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable passkey lock.');}}
-  async function lockPin(){try{await setLocalPin(pin);setPin('');setMessage('PIN lock enabled.');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable PIN lock.');}}
-  async function unlock(){await disableLock();setMessage('Device lock disabled.');}
-  return <div className="page-stack"><section className="hero-row"><div><Link to="/options" className="text-link">← Options</Link><span className="eyebrow">Options</span><h1>Settings</h1><p className="muted">Local preferences, cloud recovery, backup and device lock.</p></div></section>
-    {message&&<div className="success-banner">{message}</div>}
-    <section className="panel"><div className="panel-header"><div><h2>Transaction defaults</h2><p>Keep the add screen fast.</p></div></div><div className="settings-grid"><label>Default account<select value={settings?.defaultAccountId||''} onChange={async e=>{const current=await db.settings.get('app');if(current)await db.settings.put({...current,defaultAccountId:e.target.value||undefined});}}><option value="">No default</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}{a.isDefault?' · primary':''}</option>)}</select></label><label>Needs / Wants<select value={defaultNeedWant} onChange={e=>setDefaultNeedWant(e.target.value)}><option value="">No default</option><option value="NEED">Needs</option><option value="WANT">Wants</option></select></label><label>Essential / Discretionary<select value={defaultED} onChange={e=>setDefaultED(e.target.value)}><option value="">No default</option><option value="ESSENTIAL">Essential</option><option value="DISCRETIONARY">Discretionary</option></select></label><label>Fixed / Variable<select value={defaultFV} onChange={e=>setDefaultFV(e.target.value)}><option value="">No default</option><option value="FIXED">Fixed</option><option value="VARIABLE">Variable</option></select></label></div><div className="inline-actions"><button className="primary-btn" onClick={saveDefaults}>Save defaults</button></div></section>
-    <section className="panel"><div className="panel-header"><div><h2>Google Sheets</h2><p>Cloud copy, recovery and reporting. Credentials are runtime-only settings.</p></div><ShieldCheck size={18}/></div><div className="warning-note">Do not commit this URL or token to GitHub. The browser stores them in IndexedDB on this device.</div><label>Apps Script endpoint<input value={sheetUrl||settings?.googleSheetsEndpoint||''} onChange={e=>setSheetUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec"/></label><label>Sync token<input type="password" value={sheetToken||settings?.googleSheetsToken||''} onChange={e=>setSheetToken(e.target.value)} placeholder="Personal sync key"/></label><div className="inline-actions"><button className="secondary-btn" onClick={saveSheets}>Save connection</button><button className="primary-btn" onClick={sync}><RefreshCcw size={16}/> Sync now</button><button className="secondary-btn" onClick={restore}><DatabaseBackup size={16}/> Restore from Sheets</button></div><p className="form-help">When local transactions are empty and a valid connection already exists, the app can silently attempt a restore on launch. If no connection exists, use this section to connect first.</p></section>
-    <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Always keep a portable copy of your local database.</p></div><DatabaseBackup size={18}/></div><div className="inline-actions"><button className="secondary-btn" onClick={exportBackup}><Download size={16}/> Export JSON backup</button><label className="secondary-btn file-btn"><FileUp size={16}/> Import backup<input ref={fileRef} type="file" accept="application/json,.json" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
-    <section className="panel">
-  <div className="panel-header">
-    <div>
-      <h2>Device Lock</h2>
-
-      <p>
-        Protect the app on this device even if somebody discovers
-        the public GitHub Pages URL.
-      </p>
-    </div>
-
-    <Smartphone size={18} />
-  </div>
-
-  <div className="warning-note">
-    Face ID/passkey uses the browser's platform authenticator.
-    On supported iPhones this can use Face ID or the device passcode.
-    This is a local device lock, not a server-backed account login.
-  </div>
-
-  {settings?.lockEnabled ? (
-    <div className="device-lock-status">
-      <div className="sync-state">
-        <span className="status-dot online" />
-
-        Lock enabled
-
-        <span className="muted">
-          ({settings.lockMethod})
-        </span>
-      </div>
-
-      <div className="inline-actions">
-        <button
-          className="secondary-btn"
-          onClick={unlock}
-        >
-          <Unlock size={16} />
-          Disable lock
-        </button>
-      </div>
-    </div>
-  ) : (
-    <>
-      <div className="settings-grid">
-        <label>
-          PIN lock
-
-          <input
-            inputMode="numeric"
-            type="password"
-            maxLength={8}
-            value={pin}
-            onChange={event =>
-              setPin(event.target.value)
-            }
-            placeholder="4–8 digits"
-          />
-        </label>
-      </div>
-
-      <div className="inline-actions">
-        <button
-          className="secondary-btn"
-          onClick={lockPin}
-          disabled={!pin}
-        >
-          Enable PIN
-        </button>
-
-        {webAuthnAvailable() && (
-          <button
-            className="primary-btn"
-            onClick={lockPasskey}
-          >
-            <ShieldCheck size={16} />
-
-            Enable Face ID / passkey
-          </button>
-        )}
-      </div>
-
-      {!webAuthnAvailable() && (
-        <p className="form-help">
-          Face ID/passkey requires HTTPS and a browser
-          that supports WebAuthn platform authentication.
-          You can use a PIN instead.
-        </p>
-      )}
-    </>
-  )}
-</section>
-  </div>;
+ const settings=useSettings();const accounts=useAccounts()??[];const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [name,setName]=useState('');const [accountType,setAccountType]=useState('BANK_ACCOUNT');const [editingAccount,setEditingAccount]=useState<string|null>(null);
+ useEffect(()=>{if(settings)document.documentElement.dataset.theme=settings.theme||'dark';},[settings?.theme]);
+ const update=async(p:Partial<NonNullable<typeof settings>>)=>{const s=await db.settings.get('app');if(s)await db.settings.put({...s,...p});};
+ const saveDefaults=async()=>{await update({defaultNeedWant:undefined,defaultEssentialDiscretionary:undefined,defaultFixedVariable:undefined});setMessage('Defaults saved.');};
+ const saveSheets=async()=>{await update({googleSheetsEndpoint:sheetUrl||settings?.googleSheetsEndpoint,googleSheetsToken:sheetToken||settings?.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||settings?.googleSheetsEndpoint)});setMessage('Google Sheets connection saved.');};
+ const sync=async()=>{const r=await syncWithGoogleSheets();setMessage(r.success?`Synced ${r.processed||0} changes.`:(r.message||'Sync failed.'));};
+ const restore=async()=>{try{const r=await restoreFromGoogleSheets();setMessage(r.message);}catch(e){setMessage(e instanceof Error?e.message:'Restore failed.');}};
+ const addAccount=async()=>{if(!name.trim())return;const now=new Date().toISOString();if(editingAccount){const old=await db.accounts.get(editingAccount);if(old){const a={...old,name:name.trim(),type:accountType as any,updatedAt:now};await db.accounts.put(a);}setEditingAccount(null);setName('');setMessage('Account updated.');return;}const existing=await db.accounts.toArray();const a={id:newId('account'),name:name.trim(),type:accountType as any,isDefault:existing.length===0,active:true,createdAt:now,updatedAt:now};if(a.isDefault)await db.accounts.toArray().then(xs=>Promise.all(xs.map(x=>db.accounts.update(x.id,{isDefault:false}))));await db.accounts.put(a);setName('');setMessage('Account added.');};
+ const setDefault=async(id:string)=>{await db.transaction('rw',db.accounts,async()=>{await db.accounts.toCollection().modify({isDefault:false});await db.accounts.update(id,{isDefault:true});});await update({defaultAccountId:id});};
+ const removeAccount=async(id:string)=>{if(accounts.length<=1){setMessage('Keep at least one account.');return;}if(!confirm('Archive this account? Existing transactions remain unchanged.'))return;await db.accounts.update(id,{active:false,updatedAt:new Date().toISOString()});if(settings?.defaultAccountId===id)await update({defaultAccountId:accounts.find(a=>a.id!==id)?.id});};
+ const importBackup=async(file?:File)=>{if(!file)return;try{const data=JSON.parse(await file.text()) as any;await db.transaction('rw',[db.transactions,db.accounts,db.categories,db.recurringRules,db.reviewQueue,db.budgets,db.investments,db.interestAccounts,db.projectedIncomeEvents,db.savedReports,db.settings],async()=>{for(const k of ['transactions','accounts','categories','recurringRules','reviewQueue','budgets','investments','interestAccounts','projectedIncomeEvents','savedReports','settings'])if(Array.isArray(data[k]))await (db as any)[k].bulkPut(data[k]);});setMessage('Backup restored.');}catch(e){setMessage(e instanceof Error?e.message:'Import failed.');}};
+ const lockPasskey=async()=>{try{await enablePasskey();setMessage('Face ID / passkey lock enabled.');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable passkey lock.');}};const lockPin=async()=>{try{await setLocalPin(pin);setMessage('PIN lock enabled.');setPin('');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable PIN lock.');}};
+ return <div className="page-stack"><section className="hero-row"><div><span className="eyebrow">Configuration</span><h1>Settings</h1><p className="muted">Local data, defaults, accounts, backup and device protection.</p></div></section>{message&&<div className="success-banner">{message}</div>}
+ <section className="panel"><div className="panel-header"><div><h2>Appearance</h2><p>Choose how the app looks on this device.</p></div></div><div className="segmented"><button className={settings?.theme==='dark'?'active':''} onClick={()=>void update({theme:'dark'})}>Dark</button><button className={settings?.theme==='light'?'active':''} onClick={()=>void update({theme:'light'})}>Light</button><button className={settings?.theme==='system'?'active':''} onClick={()=>void update({theme:'system'})}>System</button></div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Default recording</h2><p>These values prefill quick transactions; they remain optional.</p></div></div><div className="settings-grid"><label>Default account<select value={settings?.defaultAccountId||''} onChange={e=>void update({defaultAccountId:e.target.value||undefined})}><option value="">None</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>Need / Want<select value={settings?.defaultNeedWant||''} onChange={e=>void update({defaultNeedWant:(e.target.value||undefined) as any})}><option value="">No default</option><option value="NEED">Need</option><option value="WANT">Want</option></select></label><label>Essential / Discretionary<select value={settings?.defaultEssentialDiscretionary||''} onChange={e=>void update({defaultEssentialDiscretionary:(e.target.value||undefined) as any})}><option value="">No default</option><option value="ESSENTIAL">Essential</option><option value="DISCRETIONARY">Discretionary</option></select></label><label>Fixed / Variable<select value={settings?.defaultFixedVariable||''} onChange={e=>void update({defaultFixedVariable:(e.target.value||undefined) as any})}><option value="">No default</option><option value="FIXED">Fixed</option><option value="VARIABLE">Variable</option></select></label></div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Accounts</h2><p>Create or modify accounts used by transactions.</p></div></div><div className="form-grid settings-grid-like"><label>Name<input value={name} onChange={e=>setName(e.target.value)} placeholder="Savings Account"/></label><label>Type<select value={accountType} onChange={e=>setAccountType(e.target.value)}><option value="BANK_ACCOUNT">Bank account</option><option value="CREDIT_CARD">Credit card</option><option value="CASH">Cash</option><option value="WALLET">Wallet</option><option value="INVESTMENT">Investment</option><option value="OTHER">Other</option></select></label></div><button className="primary-btn" onClick={()=>void addAccount()}>{editingAccount?<Pencil size={15}/>:<Plus size={15}/>} {editingAccount?'Update account':'Add account'}</button><div className="account-list">{accounts.map(a=><div className="account-row" key={a.id}><div><strong>{a.name}</strong><span>{a.type.replace('_',' ')} {a.isDefault?'· Default':''}</span></div><div className="inline-actions compact"><button className="secondary-btn" onClick={()=>{setEditingAccount(a.id);setName(a.name);setAccountType(a.type)}}><Pencil size={13}/> Edit</button><button className="secondary-btn" onClick={()=>void setDefault(a.id)} disabled={a.isDefault}>Make default</button><button className="icon-btn danger-icon" onClick={()=>void removeAccount(a.id)}><Trash2 size={14}/></button></div></div>)}</div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Google Sheets</h2><p>Optional reporting/backup layer. IndexedDB remains the local source of truth.</p></div><DatabaseBackup size={18}/></div><div className="settings-grid"><label>Web app URL<input value={sheetUrl} onChange={e=>setSheetUrl(e.target.value)} placeholder={settings?.googleSheetsEndpoint||'https://script.google.com/macros/s/.../exec'}/></label><label>Token<input type="password" value={sheetToken} onChange={e=>setSheetToken(e.target.value)} placeholder="Stored only in IndexedDB"/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>void saveSheets()}>Save connection</button><button className="primary-btn" onClick={()=>void sync()} disabled={!settings?.googleSheetsEnabled}>Sync</button><button className="secondary-btn" onClick={()=>void restore()} disabled={!settings?.googleSheetsEnabled}>Fetch from Sheet</button></div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Backup & data</h2><p>JSON is the full restore format. CSV and Excel are reporting exports.</p></div><Download size={18}/></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>void exportJson()}>Export JSON</button><button className="secondary-btn" onClick={()=>void exportCsv()}>Export CSV</button><button className="secondary-btn" onClick={()=>void exportExcel()}>Export Excel</button><label className="secondary-btn file-btn"><FileUp size={15}/> Import JSON<input ref={fileRef} type="file" accept="application/json,.json" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div><div className="warning-note">Automatic background writes to iOS Files are not reliable for a browser/PWA. The app can prepare one-tap exports when opened; a future native wrapper could provide true scheduled backups.</div><div className="danger-zone"><button className="secondary-btn" onClick={()=>{if(confirm('Clear ALL local IndexedDB data? This cannot be undone unless you exported a backup.'))void clearLocalData();}}>Clear IndexedDB & reset app</button></div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Device Lock</h2><p>Protect the local app if somebody discovers the public URL.</p></div><Smartphone size={18}/></div>{settings?.lockEnabled?<div className="inline-actions"><span className="sync-state"><span className="status-dot online"/> Lock enabled ({settings.lockMethod})</span><button className="secondary-btn" onClick={()=>void disableLock()}><Unlock size={15}/> Disable lock</button></div>:<><div className="settings-grid"><label>PIN<input inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>setPin(e.target.value)} placeholder="4–8 digits"/></label></div><div className="inline-actions"><button className="secondary-btn" disabled={!pin} onClick={()=>void lockPin()}>Enable PIN</button>{webAuthnAvailable()&&<button className="primary-btn" onClick={()=>void lockPasskey()}><ShieldCheck size={15}/> Enable Face ID / passkey</button>}</div><p className="form-help">Face ID uses the iPhone/browser platform authenticator. It requires HTTPS and supported WebAuthn.</p></>}</section>
+ <section className="panel"><div className="panel-header"><div><h2>About</h2><p>Expense Tracker · local-first personal finance</p></div><RefreshCcw size={18}/></div><div className="developer-signature">Designed & developed by <strong>A J</strong><span>React · IndexedDB · Google Sheets</span></div></section>
+ </div>;
 }
