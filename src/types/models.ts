@@ -4,7 +4,7 @@ export type TransactionSource = 'MANUAL' | 'AUTOMATION' | 'RECURRING' | 'IMPORT'
 export type SyncStatus = 'LOCAL' | 'PENDING' | 'SYNCED' | 'FAILED';
 export type QueueStatus = 'PENDING' | 'RECORDED' | 'DISCARDED';
 export type AccountType = 'BANK_ACCOUNT' | 'CREDIT_CARD' | 'CASH' | 'WALLET' | 'INVESTMENT' | 'OTHER';
-export type Frequency = 'WEEKLY' | 'MONTHLY' | 'YEARLY';
+export type Frequency = 'WEEKLY' | 'BIWEEKLY' | 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
 export interface Transaction {
   id: string;
@@ -36,6 +36,8 @@ export interface Account {
   lastFourDigits?: string;
   isDefault: boolean;
   active: boolean;
+  statementDay?: number;
+  paymentDueDay?: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -91,7 +93,7 @@ export interface ReviewQueueItem {
   accountHint?: string;
   transactionDateTime: string;
   rawMessage?: string;
-  source: 'IOS_SHORTCUT' | 'MANUAL' | 'IMPORT';
+  source: 'IOS_SHORTCUT' | 'MANUAL' | 'IMPORT' | 'RECURRING';
   status: QueueStatus;
   suggestedCategoryId?: string;
   suggestedSubcategoryId?: string;
@@ -133,7 +135,9 @@ export interface AppSettings {
   defaultNeedWant?: 'NEED' | 'WANT';
   defaultEssentialDiscretionary?: 'ESSENTIAL' | 'DISCRETIONARY';
   defaultFixedVariable?: 'FIXED' | 'VARIABLE';
-  theme: 'dark';
+  theme: 'dark' | 'light' | 'system';
+  reportingYear: 'FY' | 'CALENDAR';
+  demoPinHash?: string;
   googleSheetsEndpoint?: string;
   googleSheetsToken?: string;
   lastSuccessfulSync?: string;
@@ -153,6 +157,25 @@ export interface SyncQueueItem {
   status: 'PENDING' | 'SYNCING' | 'FAILED';
   retryCount: number;
   lastError?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface InterestDeposit {
+  id: string;
+  name: string;
+  type: 'FD' | 'RD' | 'SAVINGS';
+  principal: number;
+  installment?: number;
+  annualRate: number;
+  openingDate: string;
+  maturityDate?: string;
+  termMonths?: number;
+  compounding: 'MONTHLY' | 'QUARTERLY' | 'HALF_YEARLY' | 'YEARLY' | 'SIMPLE';
+  accountId?: string;
+  autoRecordInterest: boolean;
+  active: boolean;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }

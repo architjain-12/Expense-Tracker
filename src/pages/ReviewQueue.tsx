@@ -34,9 +34,11 @@ export default function ReviewQueue() {
       transactionDateTime: item.transactionDateTime,
       accountId: item.suggestedAccountId || defaultAccount,
       categoryId,
+      subcategoryId: item.suggestedSubcategoryId,
       merchant: item.merchant,
       notes: item.notes,
-      source: 'AUTOMATION',
+      source: item.source === 'RECURRING' ? 'RECURRING' : 'AUTOMATION',
+      recurringRuleId: item.source === 'RECURRING' ? item.externalId.split(':')[0] : undefined,
       sourceId: item.externalId,
     });
     await db.reviewQueue.update(item.id, { status: 'RECORDED', processedAt: new Date().toISOString() });
@@ -58,7 +60,7 @@ export default function ReviewQueue() {
 function ReviewCard({ item, onRecord, onDiscard }: { item: ReviewQueueItem; onRecord: () => Promise<void>; onDiscard: () => Promise<void> }) {
   return <article className="review-card">
     <div className="review-icon"><Zap size={17}/></div>
-    <div className="review-card-top"><div><strong>{item.merchant || 'Unknown merchant'}</strong><span>{new Date(item.transactionDateTime).toLocaleString('en-IN')}</span></div><strong>{item.type === 'INCOME' ? '+' : '-'}₹{item.amount.toLocaleString('en-IN')}</strong></div>
+    <div className="review-card-top"><div><strong>{item.merchant || 'Unknown merchant'}</strong><span>{item.source === 'RECURRING' ? '↻ Recurring · ' : ''}{new Date(item.transactionDateTime).toLocaleString('en-IN')}</span></div><strong>{item.type === 'INCOME' ? '+' : '-'}₹{item.amount.toLocaleString('en-IN')}</strong></div>
     {item.accountHint && <div className="review-meta">{item.accountHint}</div>}
     {item.rawMessage && <details><summary>Original notification</summary><p>{item.rawMessage}</p></details>}
     <div className="review-actions"><button className="primary-btn" onClick={onRecord}>Record</button><button className="secondary-btn" onClick={() => alert('Edit screen will be added in the next UI iteration.')}>Edit</button><button className="text-danger" onClick={onDiscard}>Discard</button></div>

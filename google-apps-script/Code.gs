@@ -40,12 +40,15 @@ function batchSync(changes) {
       const entity = String(change.entityType || '');
       const row = change.payload || {};
       if (!change.entityId && !row.id) throw new Error('Missing entity ID');
+      if (change.operation === 'DELETE') { deleteEntity(ss, sheetNameFor(entity), String(change.entityId || row.id)); processed++; return; }
       if (entity === 'TRANSACTION') upsertEntity(ss, 'Transactions', transactionHeaders(), row, ['id','transactionDateTime','type','amount','accountId','categoryId','subcategoryId','merchant','notes','source','recurringRuleId','createdAt','updatedAt','deletedAt']);
       else if (entity === 'CATEGORY') upsertEntity(ss, 'Categories', categoryHeaders(), row, ['id','name','parentId','icon','defaultNeedWant','defaultEssentialDiscretionary','defaultFixedVariable','active','sortOrder','createdAt','updatedAt']);
       else if (entity === 'ACCOUNT') upsertEntity(ss, 'Accounts', accountHeaders(), row, ['id','name','type','institution','lastFourDigits','isDefault','active','createdAt','updatedAt']);
       else if (entity === 'RECURRING_RULE') upsertEntity(ss, 'RecurringRules', recurringHeaders(), row, ['id','name','amount','type','accountId','categoryId','subcategoryId','merchant','notes','frequency','dayOfMonth','startDate','endDate','active','lastGeneratedDate','nextDueDate','createdAt','updatedAt']);
       else if (entity === 'BUDGET') upsertEntity(ss, 'Budgets', budgetHeaders(), row, ['id','categoryId','amount','period','startDate','endDate','createdAt','updatedAt']);
       else if (entity === 'INVESTMENT') upsertEntity(ss, 'Investments', investmentHeaders(), row, ['id','date','name','assetType','type','amount','accountId','notes','createdAt','updatedAt','syncStatus']);
+      else if (entity === 'INTEREST_DEPOSIT') upsertEntity(ss, 'InterestDeposits', interestHeaders(), row, ['id','name','type','principal','installment','annualRate','openingDate','maturityDate','termMonths','compounding','accountId','autoRecordInterest','active','notes','createdAt','updatedAt']);
+      else if (entity === 'REVIEW_QUEUE') upsertEntity(ss, 'ReviewQueue', reviewHeaders(), row, ['id','externalId','amount','type','merchant','accountHint','transactionDateTime','rawMessage','source','status','suggestedCategoryId','suggestedSubcategoryId','suggestedAccountId','notes','createdAt','processedAt']);
       else return;
       processed++;
     } catch (err) { failed++; errors.push(String(err)); }
@@ -71,7 +74,9 @@ function restoreAll() {
     categories: sheetObjects(ss.getSheetByName('Categories'), categoryHeaders()),
     recurringRules: sheetObjects(ss.getSheetByName('RecurringRules'), recurringHeaders()),
     budgets: sheetObjects(ss.getSheetByName('Budgets'), budgetHeaders()),
-    investments: sheetObjects(ss.getSheetByName('Investments'), investmentHeaders())
+    investments: sheetObjects(ss.getSheetByName('Investments'), investmentHeaders()),
+    interestDeposits: sheetObjects(ss.getSheetByName('InterestDeposits'), interestHeaders()),
+    reviewQueue: sheetObjects(ss.getSheetByName('ReviewQueue'), reviewHeaders())
   };
 }
 
@@ -84,6 +89,9 @@ function sheetObjects(sheet, headers) {
     return object;
   });
 }
+
+function sheetNameFor(entity) { const map = { TRANSACTION:'Transactions', CATEGORY:'Categories', ACCOUNT:'Accounts', RECURRING_RULE:'RecurringRules', BUDGET:'Budgets', INVESTMENT:'Investments', INTEREST_DEPOSIT:'InterestDeposits', REVIEW_QUEUE:'ReviewQueue' }; return map[entity] || entity; }
+function deleteEntity(ss, sheetName, id) { const sheet=ss.getSheetByName(sheetName); if(!sheet) return; const map=existingRowMap(sheet); if(map[id]) sheet.deleteRow(map[id]); }
 
 function existingRowMap(sheet) {
   const map = {}; const lastRow = sheet.getLastRow(); if (lastRow < 2) return map;
@@ -98,6 +106,8 @@ function accountHeaders() { return ['id','name','type','institution','lastFourDi
 function recurringHeaders() { return ['id','name','amount','type','accountId','categoryId','subcategoryId','merchant','notes','frequency','dayOfMonth','startDate','endDate','active','lastGeneratedDate','nextDueDate','createdAt','updatedAt']; }
 function budgetHeaders() { return ['id','categoryId','amount','period','startDate','endDate','createdAt','updatedAt']; }
 function investmentHeaders() { return ['id','date','name','assetType','type','amount','accountId','notes','createdAt','updatedAt','syncStatus']; }
+function interestHeaders() { return ['id','name','type','principal','installment','annualRate','openingDate','maturityDate','termMonths','compounding','accountId','autoRecordInterest','active','notes','createdAt','updatedAt']; }
+function reviewHeaders() { return ['id','externalId','amount','type','merchant','accountHint','transactionDateTime','rawMessage','source','status','suggestedCategoryId','suggestedSubcategoryId','suggestedAccountId','notes','createdAt','processedAt']; }
 
 function getOrCreateSheet(ss, name, headers) {
   let sheet = ss.getSheetByName(name); if (!sheet) sheet = ss.insertSheet(name); if (sheet.getLastRow() === 0) sheet.appendRow(headers); return sheet;

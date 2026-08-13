@@ -15,15 +15,19 @@ import Categories from '../pages/Categories';
 import Budgets from '../pages/Budgets';
 import Investments from '../pages/Investments';
 import TransactionDetail from '../pages/TransactionDetail';
+import Interest from '../pages/Interest';
+import Income from '../pages/Income';
 import EditTransaction from '../pages/EditTransaction';
 import { ensureSeedData } from '../db/seed';
 import { processDueRecurringTransactions } from '../services/recurringService';
 import { restoreFromGoogleSheetsIfEmpty } from '../services/googleSheetsService';
+import { useSettings } from '../hooks/useDb';
 
+function ThemeSync(){const settings=useSettings();useEffect(()=>{const theme=settings?.theme||'dark';document.documentElement.dataset.theme=theme;},[settings?.theme]);return null;}
 function Bootstrap(){useEffect(()=>{const run=async()=>{await ensureSeedData();await processDueRecurringTransactions();await restoreFromGoogleSheetsIfEmpty();};void run();},[]);return null;}
 
 export default function App(){return <BrowserRouter basename={import.meta.env.BASE_URL}>
-    <Bootstrap/>
+    <Bootstrap/><ThemeSync/>
     <ErrorBoundary>
         <AppLockGuard>
             <Routes>
@@ -39,6 +43,8 @@ export default function App(){return <BrowserRouter basename={import.meta.env.BA
                 <Route path="/categories" element={<Categories/>}/>
                 <Route path="/budgets" element={<Budgets/>}/>
                 <Route path="/investments" element={<Investments/>}/>
+                <Route path="/interest" element={<Interest/>}/>
+                <Route path="/income" element={<Income/>}/>
                 <Route path="/recurring" element={<Recurring/>}/>
                 <Route path="/options" element={<Options/>}/>
                 <Route path="/settings" element={<Settings/>}/>

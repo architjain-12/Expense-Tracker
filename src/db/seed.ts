@@ -53,14 +53,45 @@ function buildCategories(): Category[] {
   return result;
 }
 
+
+async function seedDemoTransactions(): Promise<void> {
+  if (await db.transactions.count() > 0) return;
+  const roots = await db.categories.filter(c => !c.parentId).toArray();
+  const food = roots.find(c => c.name === 'Food & Dining')?.id;
+  const transport = roots.find(c => c.name === 'Transportation')?.id;
+  const shopping = roots.find(c => c.name === 'Shopping')?.id;
+  const account = 'account-hdfc-bank';
+  const nowDate = new Date();
+  const items = [
+    { days: 2, amount: 1200, merchant: 'Demo Groceries', categoryId: food },
+    { days: 5, amount: 650, merchant: 'Demo Fuel', categoryId: transport },
+    { days: 9, amount: 2100, merchant: 'Demo Shopping', categoryId: shopping },
+    { days: 14, amount: 890, merchant: 'Demo Restaurant', categoryId: food },
+    { days: 22, amount: 1500, merchant: 'Demo Commute', categoryId: transport },
+  ];
+  for (let monthOffset = 1; monthOffset >= 0; monthOffset--) {
+    const base = new Date(nowDate.getFullYear(), nowDate.getMonth() - monthOffset, 1);
+    for (const item of items) {
+      const d = new Date(base.getFullYear(), base.getMonth(), Math.min(item.days, 28), 19, 0, 0);
+      await db.transactions.put({ id: newId('demo-txn'), type: 'EXPENSE', amount: item.amount, transactionDateTime: d.toISOString(), accountId: account, categoryId: item.categoryId, merchant: item.merchant, source: 'IMPORT', createdAt: d.toISOString(), updatedAt: d.toISOString(), syncStatus: 'LOCAL' });
+    }
+    const salary = new Date(base.getFullYear(), base.getMonth(), 1, 10, 0, 0);
+    await db.transactions.put({ id: newId('demo-income'), type: 'INCOME', amount: 85000, transactionDateTime: salary.toISOString(), accountId: account, categoryId: roots.find(c=>c.name==='Income')?.id, merchant: 'Demo Salary', source: 'IMPORT', createdAt: salary.toISOString(), updatedAt: salary.toISOString(), syncStatus: 'LOCAL' });
+  }
+}
+
 export async function ensureSeedData(): Promise<void> {
   if ((await db.accounts.count()) === 0) await db.accounts.bulkAdd(defaultAccounts);
   if ((await db.categories.count()) === 0) await db.categories.bulkAdd(buildCategories());
   if (!(await db.accounts.filter(a => a.active && a.isDefault).count())) await db.accounts.update('account-hdfc-bank', { isDefault: true });
   if (!(await db.settings.get('app'))) {
-    const settings: AppSettings = { id: 'app', currency: 'INR', defaultAccountId: 'account-hdfc-bank', theme: 'dark', googleSheetsEnabled: false };
+    const settings: AppSettings = { id: 'app', currency: 'INR', defaultAccountId: 'account-hdfc-bank', theme: 'dark', reportingYear: 'FY', googleSheetsEnabled: false };
     await db.settings.put(settings);
   }
+  const currentSettings = await db.settings.get('app');
+  if (currentSettings && !currentSettings.reportingYear) await db.settings.put({...currentSettings, reportingYear:'FY', theme:currentSettings.theme||'dark'});
+  // Demo partition is intentionally populated on every fresh demo database.
+  if (typeof localStorage !== 'undefined' && localStorage.getItem('expense-tracker-active-partition') === 'demo') await seedDemoTransactions();
 
   // Repair older installations that had categories without subcategories.
   const categoryCount = await db.categories.count();
