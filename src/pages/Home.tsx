@@ -14,7 +14,23 @@ export default function Home(){
  const monthTransactions=useMemo(()=>transactions.filter(t=>t.transactionDateTime.slice(0,7)===monthKey),[transactions]);
  const expenses=monthTransactions.filter(t=>t.type==='EXPENSE').reduce((s,t)=>s+t.amount,0); const income=monthTransactions.filter(t=>t.type==='INCOME').reduce((s,t)=>s+t.amount,0);
  const overallBudget=budgets.find(b=>!b.categoryId&&b.period==='MONTHLY'); const budget=overallBudget?.amount||0; const pct=budget?expenses/budget*100:0; const remaining=budget-expenses;
- const estimatedDues=useMemo(()=>recurring.filter(r=>r.active&&r.nextDueDate.slice(0,7)===monthKey).reduce((s,r)=>s+r.amount,0),[recurring]);
+ const estimatedDues = useMemo(() => {
+  return recurring
+    .filter((r) => {
+      if (!r.active || !r.nextDueDate) return false;
+
+      const date = new Date(r.nextDueDate);
+
+      if (Number.isNaN(date.getTime())) return false;
+
+      const dueMonth = `${date.getFullYear()}-${String(
+        date.getMonth() + 1
+      ).padStart(2, "0")}`;
+
+      return dueMonth === monthKey;
+    })
+    .reduce((sum, r) => sum + Number(r.amount || 0), 0);
+}, [recurring, monthKey]);
  const estimatedSavings=(budget||income)-expenses-estimatedDues;
  const categoryData=useMemo(()=>{const map=new Map<string,number>();monthTransactions.filter(t=>t.type==='EXPENSE').forEach(t=>map.set(t.categoryId||'uncategorized',(map.get(t.categoryId||'uncategorized')||0)+t.amount));return [...map.entries()].sort((a,b)=>b[1]-a[1]).map(([id,amount])=>({id,name:categories.find(c=>c.id===id)?.name||'Uncategorized',amount,percent:expenses?amount/expenses*100:0}));},[monthTransactions,categories,expenses]);
  const recent=transactions.slice().sort((a,b)=>+new Date(b.transactionDateTime)-+new Date(a.transactionDateTime)).slice(0,8);
