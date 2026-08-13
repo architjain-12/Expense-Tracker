@@ -5,13 +5,66 @@ import type { RecurringRule, ReviewQueueItem } from '../types/models';
 import { queueEntitySync } from './syncService';
 
 function calculateNextDue(rule: RecurringRule, from: Date): string {
-  if (rule.frequency === 'WEEKLY') return addWeeks(from, 1).toISOString();
-  if (rule.frequency === 'BIWEEKLY') return addWeeks(from, 2).toISOString();
-  if (rule.frequency === 'QUARTERLY') return addMonths(from, 3).toISOString();
-  if (rule.frequency === 'YEARLY') return addYears(from, 1).toISOString();
-  const nextMonth = addMonths(from, 1);
-  const day = Math.min(rule.dayOfMonth ?? 1, new Date(nextMonth.getFullYear(), nextMonth.getMonth() + 1, 0).getDate());
-  return setDate(nextMonth, day).toISOString();
+  if (rule.frequency === 'WEEKLY') {
+    return addWeeks(from, 1).toISOString();
+  }
+
+  if (rule.frequency === 'BIWEEKLY') {
+    return addWeeks(from, 2).toISOString();
+  }
+
+  if (rule.frequency === 'QUARTERLY') {
+    return addMonths(from, 3).toISOString();
+  }
+
+  if (rule.frequency === 'YEARLY') {
+    return addYears(from, 1).toISOString();
+  }
+
+  // MONTHLY
+  const day = rule.dayOfMonth ?? 1;
+
+  // First try this month's occurrence.
+  const currentMonth = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    1
+  );
+
+  const lastDayOfCurrentMonth = new Date(
+    from.getFullYear(),
+    from.getMonth() + 1,
+    0
+  ).getDate();
+
+  const currentDueDate = new Date(
+    from.getFullYear(),
+    from.getMonth(),
+    Math.min(day, lastDayOfCurrentMonth)
+  );
+
+  // If this month's due date is today or in the future,
+  // use this month.
+  if (currentDueDate >= from) {
+    return currentDueDate.toISOString();
+  }
+
+  // Otherwise use next month.
+  const nextMonth = addMonths(currentMonth, 1);
+
+  const lastDayOfNextMonth = new Date(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth() + 1,
+    0
+  ).getDate();
+
+  const nextDueDate = new Date(
+    nextMonth.getFullYear(),
+    nextMonth.getMonth(),
+    Math.min(day, lastDayOfNextMonth)
+  );
+
+  return nextDueDate.toISOString();
 }
 
 /**
