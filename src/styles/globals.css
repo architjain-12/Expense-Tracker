@@ -2453,13 +2453,23 @@ select option {
      CATEGORY CHART
      ========================================================= */
   
-  .home-category-card .panel-header {
-    padding-bottom: 5px;
+  /* Keep the category list above the chart layer */
+  .home-category-card .stacked-list {
+    position: relative;
+    z-index: 10;
   }
-  
-  .home-pie-chart {
-    padding-top: 0;
-    padding-bottom: 0;
+
+  .home-category-card .stat-row {
+    position: relative;
+    z-index: 11;
+    pointer-events: auto;
+  }
+
+  /* Prevent the chart wrapper from intercepting
+    clicks outside the actual chart */
+  .home-category-card .spending-donut {
+    position: relative;
+    z-index: 1;
   }
   
   
