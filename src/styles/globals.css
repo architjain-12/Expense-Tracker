@@ -184,8 +184,41 @@ select option { background:#15181d; }
 .inline-actions { display:flex; gap:10px; align-items:center; padding:10px 10px 10px; flex-wrap:wrap; }
 .warning-note { margin:0 18px 14px; padding:11px 12px; border-radius:10px; background:#241e12; border:1px solid #493d27; color:#ceb97d; font-size:11px; line-height:1.5; }
 
-.modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.62); display:grid; place-items:center; z-index:80; padding:20px; }
-.modal { width:min(650px,100%); background:var(--surface); border:1px solid var(--border); border-radius:18px; box-shadow:0 30px 80px rgba(0,0,0,.42); padding-bottom:18px; }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.62);
+  display: grid;
+  place-items: center;
+  z-index: 80;
+  padding: 20px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.modal {
+  width: min(650px, 100%);
+  max-height: calc(100dvh - 40px);
+
+  display: flex;
+  flex-direction: column;
+
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px rgba(0,0,0,.42);
+
+  padding-bottom: 18px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+.modal .form-grid {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 8px 16px;
+}
+.modal .inline-actions {
+  flex-shrink: 0;
+}
 
 .bottom-nav { display:none; }
 
@@ -311,3 +344,72 @@ select option { background:#15181d; }
 .inline-create-link { border:0; background:none; color:#9da8ff; font-size:11px; padding:3px 0; text-align:left; }
 .metric-grid.compact { grid-template-columns:repeat(2,1fr); padding:16px 18px; }
 @media (max-width:720px){.filter-controls{grid-template-columns:1fr}.report-toolbar{display:grid;grid-template-columns:auto auto 1fr auto}.report-toolbar select{grid-column:1/-1}.period-label{min-width:0}.stats-actions{width:100%}.stats-actions button{flex:1}.month-nav{justify-content:space-between}.metric-grid.compact{padding:14px}.budget-progress{margin:0 14px}.budget-progress-labels{padding-left:14px;padding-right:14px}}
+
+
+.dues-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dues-chevron {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-bottom: 2px;
+  text-align: right;
+}
+
+.estimated-dues-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.estimated-due-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 12px 14px;
+
+  border: 0;
+  border-radius: 10px;
+
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+
+  text-align: left;
+  cursor: pointer;
+}
+
+.estimated-due-item > div:first-child {
+  min-width: 0;
+}
+
+.estimated-due-item strong {
+  display: block;
+  font-size: 13px;
+}
+
+.estimated-due-item small {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.estimated-due-amount {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.estimated-due-amount span {
+  font-size: 18px;
+  opacity: 0.5;
+}
