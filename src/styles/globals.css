@@ -2597,24 +2597,81 @@ select option {
     z-index: 1;
   }
   
-  .donut-center {
-    position: absolute;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    display: grid;
-    gap: 4px;
-    text-align: center;
-    pointer-events: none;
-  }
-  
-  .donut-center span {
-    color: var(--muted);
-    font-size: 11px;
-  }
-  
-  .donut-center strong {
-    color: var(--text);
-    font-size: 20px;
-    letter-spacing: -0.03em;
-  }
+  /* =========================================================
+   HOME - SPENDING DONUT
+   ========================================================= */
+
+.spending-donut {
+  position: relative;
+  height: 250px;
+  padding: 0;
+}
+
+.spending-donut .recharts-responsive-container {
+  position: relative;
+  z-index: 1;
+}
+
+.spending-donut .recharts-wrapper {
+  outline: none !important;
+}
+
+.spending-donut .recharts-surface {
+  outline: none !important;
+}
+
+.spending-donut .recharts-sector {
+  outline: none !important;
+}
+
+/* Center information inside donut */
+.donut-center {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 120px;
+
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+
+  text-align: center;
+  pointer-events: none;
+}
+
+.donut-center span {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.3;
+
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.donut-center strong {
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 17px;
+  line-height: 1.2;
+}
+
+.donut-center small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+/* Prevent Recharts focus outline on mobile tap */
+.spending-donut svg,
+.spending-donut path {
+  outline: none !important;
+}
+
+.spending-donut svg:focus,
+.spending-donut path:focus {
+  outline: none !important;
+}

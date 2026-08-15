@@ -61,47 +61,79 @@ export default function Home() {
   const reviewQueue = useReviewQueue() ?? [];
   const budgets = useBudgets() ?? [];
   const recurring = useRecurringRules() ?? [];
+
   useSettings();
 
   const monthKey = getCurrentMonthKey();
 
-  const [estimatedDuesExpanded, setEstimatedDuesExpanded] =
-    useState(false);
+  const [
+    estimatedDuesExpanded,
+    setEstimatedDuesExpanded,
+  ] = useState(false);
+
+  const [
+    selectedCategory,
+    setSelectedCategory,
+  ] = useState<string | null>(null);
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * CURRENT MONTH TRANSACTIONS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const monthTransactions = useMemo(
     () =>
       transactions.filter(
-        t => t.transactionDateTime?.slice(0, 7) === monthKey
+        t =>
+          t.transactionDateTime?.slice(0, 7) ===
+          monthKey
       ),
     [transactions, monthKey]
   );
+
+  /*
+   * =========================================================
+   * MONTHLY EXPENSES
+   * =========================================================
+   */
 
   const expenses = useMemo(
     () =>
       monthTransactions
         .filter(t => t.type === 'EXPENSE')
-        .reduce((sum, t) => sum + Number(t.amount || 0), 0),
+        .reduce(
+          (sum, t) =>
+            sum + Number(t.amount || 0),
+          0
+        ),
     [monthTransactions]
   );
+
+  /*
+   * =========================================================
+   * MONTHLY INCOME
+   * =========================================================
+   */
 
   const income = useMemo(
     () =>
       monthTransactions
         .filter(t => t.type === 'INCOME')
-        .reduce((sum, t) => sum + Number(t.amount || 0), 0),
+        .reduce(
+          (sum, t) =>
+            sum + Number(t.amount || 0),
+          0
+        ),
     [monthTransactions]
   );
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * MONTHLY BUDGET
-   * ---------------------------------------------------------
+   *
+   * Same logic used elsewhere in the application.
+   * =========================================================
    */
 
   const overallBudget = useMemo(
@@ -114,12 +146,14 @@ export default function Home() {
     [budgets]
   );
 
-  const budget = Number(overallBudget?.amount || 0);
+  const budget = Number(
+    overallBudget?.amount || 0
+  );
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * ESTIMATED RECURRING DUES
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const estimatedDueItems = useMemo(() => {
@@ -127,14 +161,17 @@ export default function Home() {
       `${monthKey}-01T00:00:00`
     );
 
-    const occurrences = getRecurringOccurrencesForMonth(
-      recurring,
-      monthDate
-    );
+    const occurrences =
+      getRecurringOccurrencesForMonth(
+        recurring,
+        monthDate
+      );
 
     return occurrences
       .map(occurrence => {
-        const day = toDateKey(occurrence.dueDate);
+        const day = toDateKey(
+          occurrence.dueDate
+        );
 
         const externalId =
           `${occurrence.rule.id}:${day}`;
@@ -149,8 +186,12 @@ export default function Home() {
         const alreadyRecorded =
           transactions.some(
             t =>
-              t.recurringRuleId === occurrence.rule.id &&
-              t.transactionDateTime?.slice(0, 10) === day
+              t.recurringRuleId ===
+                occurrence.rule.id &&
+              t.transactionDateTime?.slice(
+                0,
+                10
+              ) === day
           );
 
         if (
@@ -171,11 +212,13 @@ export default function Home() {
             occurrence.rule.amount || 0
           ),
           dueDate: occurrence.dueDate,
-          type: 'RECURRING',
+          type: 'RECURRING' as const,
         };
       })
       .filter(
-        item =>
+        (
+          item
+        ): item is NonNullable<typeof item> =>
           item !== null
       );
   }, [
@@ -184,6 +227,12 @@ export default function Home() {
     transactions,
     monthKey,
   ]);
+
+  /*
+   * =========================================================
+   * ESTIMATED DUES TOTAL
+   * =========================================================
+   */
 
   const estimatedDues = useMemo(
     () =>
@@ -196,9 +245,9 @@ export default function Home() {
   );
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * BUDGET CALCULATIONS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const spentPercentage =
@@ -215,55 +264,72 @@ export default function Home() {
     budget - expenses;
 
   const remainingAfterDues =
-    budget - expenses - estimatedDues;
+    budget -
+    expenses -
+    estimatedDues;
 
   /*
-   * Prevent the visual dues segment from going
-   * beyond the remaining budget.
+   * Keep visual percentages inside the budget bar.
    */
-  const safeSpentPercentage = Math.min(
-    100,
-    Math.max(0, spentPercentage)
-  );
 
-  const remainingPercentage = Math.max(
-    0,
-    100 - safeSpentPercentage
-  );
+  const safeSpentPercentage =
+    Math.min(
+      100,
+      Math.max(0, spentPercentage)
+    );
 
-  const safeDuesPercentage = Math.min(
-    remainingPercentage,
-    Math.max(0, duesPercentage)
-  );
+  const remainingPercentage =
+    Math.max(
+      0,
+      100 - safeSpentPercentage
+    );
+
+  const safeDuesPercentage =
+    Math.min(
+      remainingPercentage,
+      Math.max(0, duesPercentage)
+    );
 
   /*
-   * Savings / available money after estimated dues.
+   * =========================================================
+   * ESTIMATED SAVINGS
+   * =========================================================
    *
    * If a budget exists:
-   * budget - expenses - estimated dues
+   *
+   *   budget - expenses - dues
    *
    * Otherwise:
-   * income - expenses - estimated dues
+   *
+   *   income - expenses - dues
+   * =========================================================
    */
+
   const estimatedSavings =
     budget > 0
       ? remainingAfterDues
-      : income - expenses - estimatedDues;
+      : income -
+        expenses -
+        estimatedDues;
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * CATEGORY DATA
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const categoryData = useMemo(() => {
-    const map = new Map();
+    const map =
+      new Map<string, number>();
 
     monthTransactions
-      .filter(t => t.type === 'EXPENSE')
+      .filter(
+        t => t.type === 'EXPENSE'
+      )
       .forEach(t => {
         const id =
-          t.categoryId || 'uncategorized';
+          t.categoryId ||
+          'uncategorized';
 
         map.set(
           id,
@@ -273,20 +339,26 @@ export default function Home() {
       });
 
     return [...map.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([id, amount]) => ({
-        id,
-        name:
-          categories.find(
-            c => c.id === id
-          )?.name ||
-          'Uncategorized',
-        amount,
-        percent:
-          expenses > 0
-            ? (amount / expenses) * 100
-            : 0,
-      }));
+      .sort(
+        (a, b) => b[1] - a[1]
+      )
+      .map(
+        ([id, amount]) => ({
+          id,
+          name:
+            categories.find(
+              c => c.id === id
+            )?.name ||
+            'Uncategorized',
+          amount,
+          percent:
+            expenses > 0
+              ? (amount /
+                  expenses) *
+                100
+              : 0,
+        })
+      );
   }, [
     monthTransactions,
     categories,
@@ -294,9 +366,9 @@ export default function Home() {
   ]);
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * RECENT TRANSACTIONS
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const recent = useMemo(
@@ -317,9 +389,9 @@ export default function Home() {
   );
 
   /*
-   * ---------------------------------------------------------
+   * =========================================================
    * CURRENT MONTH LABEL
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   const monthLabel = new Date(
@@ -333,18 +405,50 @@ export default function Home() {
   );
 
   /*
-   * ---------------------------------------------------------
-   * PIE CHARt
-   * ---------------------------------------------------------
+   * =========================================================
+   * SELECTED CATEGORY
+   * =========================================================
    */
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const selectedCategoryData = categoryData.find(
-    c => c.id === selectedCategory
-  );
+
+  const selectedCategoryData =
+    categoryData.find(
+      category =>
+        category.id ===
+        selectedCategory
+    );
+
   /*
-   * ---------------------------------------------------------
+   * =========================================================
+   * CATEGORY SELECTION
+   * =========================================================
+   */
+
+  const handleCategorySelect = (
+    categoryId: string
+  ) => {
+    setSelectedCategory(
+      current =>
+        current === categoryId
+          ? null
+          : categoryId
+    );
+  };
+
+  const handleCategoryFilter = (
+    categoryId: string
+  ) => {
+    navigate({
+      pathname: '/transactions',
+      search: `?month=${monthKey}&category=${encodeURIComponent(
+        categoryId
+      )}`,
+    });
+  };
+
+  /*
+   * =========================================================
    * RENDER
-   * ---------------------------------------------------------
+   * =========================================================
    */
 
   return (
@@ -355,21 +459,25 @@ export default function Home() {
       ====================================================== */}
 
       <section className="home-header">
+
         <span className="eyebrow">
           Current month
         </span>
 
-        <h1>{monthLabel}</h1>
+        <h1>
+          {monthLabel}
+        </h1>
 
         <p className="muted">
-          Your important financial snapshot
-          at a glance.
+          Your important financial
+          snapshot at a glance.
         </p>
+
       </section>
 
 
       {/* =====================================================
-          BUDGET + COMBINED SPENDING BAR
+          BUDGET + ESTIMATED DUES
       ====================================================== */}
 
       <section className="panel home-budget-card">
@@ -377,15 +485,21 @@ export default function Home() {
         <div className="home-budget-header">
 
           <div>
+
             <span className="home-section-label">
               Monthly budget
             </span>
 
             {budget > 0 ? (
+
               <div className="home-budget-remaining">
+
                 <strong>
                   {formatCurrency(
-                    Math.max(remaining, 0)
+                    Math.max(
+                      remaining,
+                      0
+                    )
                   )}
                 </strong>
 
@@ -394,58 +508,86 @@ export default function Home() {
                 </span>
 
                 <span className="home-budget-total">
-                  / {formatCurrency(budget)}
+                  /{' '}
+                  {formatCurrency(
+                    budget
+                  )}
                 </span>
+
               </div>
+
             ) : (
+
               <div className="home-budget-remaining">
-                <strong>—</strong>
+
+                <strong>
+                  —
+                </strong>
 
                 <span>
-                  No monthly budget configured
+                  No monthly budget
+                  configured
                 </span>
+
               </div>
+
             )}
+
           </div>
 
+
           {budget > 0 && (
+
             <div className="home-budget-percent">
+
               {Math.round(
-                Math.min(100, spentPercentage)
+                Math.min(
+                  100,
+                  spentPercentage
+                )
               )}
               % used
+
             </div>
+
           )}
 
         </div>
 
 
         {/* =================================================
-            COMBINED BUDGET BAR
+            COMBINED BAR
 
-            Accent = Actual spending
-            Warning = Estimated dues
-            Empty  = Remaining
+            Actual spending
+            +
+            Estimated dues
+            +
+            Remaining
         ================================================== */}
 
         <div className="home-combined-budget">
 
           {budget > 0 && (
             <>
+
               <span
                 className="home-budget-spent-segment"
                 style={{
-                  width: `${safeSpentPercentage}%`,
+                  width:
+                    `${safeSpentPercentage}%`,
                 }}
               />
 
               <span
                 className="home-budget-dues-segment"
                 style={{
-                  left: `${safeSpentPercentage}%`,
-                  width: `${safeDuesPercentage}%`,
+                  left:
+                    `${safeSpentPercentage}%`,
+                  width:
+                    `${safeDuesPercentage}%`,
                 }}
               />
+
             </>
           )}
 
@@ -455,29 +597,40 @@ export default function Home() {
         <div className="home-budget-labels">
 
           <span>
+
             <i className="home-budget-dot spent" />
 
-            {formatCurrency(expenses)} spent
+            {formatCurrency(
+              expenses
+            )}{' '}
+            spent
+
           </span>
 
+
           <span>
+
             <i className="home-budget-dot dues" />
 
             {formatCurrency(
               estimatedDues
             )}{' '}
             estimated dues
+
           </span>
 
+
           <span>
+
             {budget > 0
-              ? formatCurrency(
+              ? `${formatCurrency(
                   Math.max(
                     remainingAfterDues,
                     0
                   )
-                ) + ' after dues'
+                )} after dues`
               : 'Set a budget in Options'}
+
           </span>
 
         </div>
@@ -493,12 +646,16 @@ export default function Home() {
 
         <MetricCard
           label="Income"
-          value={formatCurrency(income)}
+          value={formatCurrency(
+            income
+          )}
         />
 
         <MetricCard
           label="Spent"
-          value={formatCurrency(expenses)}
+          value={formatCurrency(
+            expenses
+          )}
         />
 
         <MetricCard
@@ -516,34 +673,45 @@ export default function Home() {
       ====================================================== */}
 
       {reviewQueue.length > 0 && (
+
         <Link
           to="/review"
           className="home-review-alert"
         >
+
           <div className="home-review-icon">
             <AlertCircle size={18} />
           </div>
 
+
           <div className="home-review-content">
+
             <strong>
+
               {reviewQueue.length}{' '}
               pending review{' '}
+
               {reviewQueue.length === 1
                 ? 'item'
                 : 'items'}
+
             </strong>
 
             <span>
               Transactions are waiting
               for confirmation.
             </span>
+
           </div>
+
 
           <ChevronRight
             size={18}
             className="home-review-arrow"
           />
+
         </Link>
+
       )}
 
 
@@ -566,6 +734,7 @@ export default function Home() {
           <div className="home-dues-title">
 
             <div>
+
               <h2>
                 Estimated dues
               </h2>
@@ -574,9 +743,11 @@ export default function Home() {
                 Future recurring expenses
                 expected this month.
               </p>
+
             </div>
 
           </div>
+
 
           <div className="home-dues-summary">
 
@@ -603,30 +774,39 @@ export default function Home() {
         <div className="home-dues-footer">
 
           <span>
+
             {estimatedDueItems.length}{' '}
             future expense
+
             {estimatedDueItems.length !== 1
               ? 's'
               : ''}
+
           </span>
 
+
           <span>
+
             {estimatedDuesExpanded
               ? 'Tap to hide'
               : 'Tap to view'}
+
           </span>
 
         </div>
 
 
         {estimatedDuesExpanded && (
+
           <div className="estimated-dues-list">
 
             {estimatedDueItems.length === 0 ? (
 
               <div className="empty-inline">
+
                 No estimated dues for
                 this month.
+
               </div>
 
             ) : (
@@ -644,25 +824,35 @@ export default function Home() {
                   >
 
                     <div>
+
                       <strong>
                         {item.name}
                       </strong>
 
                       <small>
+
                         Due{' '}
+
                         {item.dueDate.toLocaleDateString(
                           undefined,
                           {
-                            day: 'numeric',
-                            month: 'short',
+                            day:
+                              'numeric',
+                            month:
+                              'short',
                           }
                         )}
+
                         {' · '}
                         Recurring
+
                       </small>
+
                     </div>
 
+
                     <div className="estimated-due-amount">
+
                       {formatCurrency(
                         item.amount
                       )}
@@ -672,6 +862,7 @@ export default function Home() {
                           size={16}
                         />
                       </span>
+
                     </div>
 
                   </button>
@@ -682,6 +873,7 @@ export default function Home() {
             )}
 
           </div>
+
         )}
 
       </section>
@@ -696,6 +888,7 @@ export default function Home() {
         <div className="panel-header">
 
           <div>
+
             <h2>
               Recent transactions
             </h2>
@@ -704,7 +897,9 @@ export default function Home() {
               Latest confirmed ledger
               activity
             </p>
+
           </div>
+
 
           <Link
             to="/transactions"
@@ -714,6 +909,7 @@ export default function Home() {
           </Link>
 
         </div>
+
 
         <TransactionList
           transactions={recent}
@@ -738,14 +934,16 @@ export default function Home() {
         <div className="panel-header">
 
           <div>
+
             <h2>
               Spending by category
             </h2>
 
             <p>
-              Tap a category to filter
-              Transactions.
+              Tap a category to highlight
+              it in the chart.
             </p>
+
           </div>
 
           <PieIcon size={18} />
@@ -756,81 +954,286 @@ export default function Home() {
         {categoryData.length ? (
 
           <>
+
+            {/* =================================================
+                DONUT
+            ================================================== */}
+
             <div className="chart-box spending-donut">
-              <ResponsiveContainer width="100%" height={280}>
+
+              <ResponsiveContainer
+                width="100%"
+                height={280}
+              >
+
                 <PieChart>
-                <Pie
-                  data={categoryData}
-                  dataKey="amount"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="52%"
-                  outerRadius="72%"
-                  paddingAngle={2}
-                  stroke="none"
-                  activeShape={false}
-                  isAnimationActive={true}
-                >
-                  {categoryData.map((c, i) => (
-                    <Cell
-                      key={c.id}
-                      fill={PIE_COLORS[i % PIE_COLORS.length]}
-                      stroke="none"
-                      style={{ outline: "none" }}
-                    />
-                  ))}
-                </Pie>
-                  <Tooltip
-                    formatter={(value, name) => [
-                      formatCurrency(Number(value)),
-                      name,
-                    ]}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
 
-              <div className="donut-center">
-                <span>Total spent</span>
-                <strong>{formatCurrency(expenses)}</strong>
-              </div>
-            </div>
+                  <Pie
+                    data={categoryData}
+                    dataKey="amount"
+                    nameKey="name"
 
-            <div className="stacked-list">
+                    cx="50%"
+                    cy="50%"
 
-              {categoryData.map(
-                category => (
+                    innerRadius="52%"
+                    outerRadius="72%"
 
-                  <button
-                    className="stat-row clickable"
-                    key={category.id}
-                    onClick={() =>
-                      navigate(
-                        `/transactions?month=${monthKey}&category=${category.id}`
-                      )
-                    }
+                    paddingAngle={2}
+
+                    stroke="none"
+
+                    isAnimationActive={false}
+
+                    /*
+                     * IMPORTANT:
+                     *
+                     * We do NOT use activeShape.
+                     *
+                     * This prevents Recharts from
+                     * drawing a bordered/expanded
+                     * sector when tapping on mobile.
+                     */
+
+                    activeIndex={-1}
+
+                    onClick={(
+                      _,
+                      index
+                    ) => {
+
+                      const category =
+                        categoryData[
+                          index
+                        ];
+
+                      if (!category) {
+                        return;
+                      }
+
+                      handleCategorySelect(
+                        category.id
+                      );
+
+                    }}
                   >
 
+                    {categoryData.map(
+                      (
+                        category,
+                        index
+                      ) => {
+
+                        const isSelected =
+                          selectedCategory ===
+                          category.id;
+
+                        const hasSelection =
+                          selectedCategory !==
+                          null;
+
+                        return (
+
+                          <Cell
+                            key={
+                              category.id
+                            }
+
+                            fill={
+                              PIE_COLORS[
+                                index %
+                                  PIE_COLORS.length
+                              ]
+                            }
+
+                            stroke="none"
+
+                            /*
+                             * Selected category
+                             * stays fully visible.
+                             *
+                             * Other categories
+                             * become slightly dim.
+                             */
+
+                            opacity={
+                              hasSelection &&
+                              !isSelected
+                                ? 0.30
+                                : 1
+                            }
+
+                          />
+
+                        );
+
+                      }
+                    )}
+
+                  </Pie>
+
+
+                  {/* =================================================
+                      TOOLTIP
+
+                      Shows:
+                      Category name
+                      Amount
+                  ================================================== */}
+
+                  {/* <Tooltip
+                    formatter={(
+                      value,
+                      name
+                    ) => [
+                      formatCurrency(
+                        Number(value)
+                      ),
+                      String(name),
+                    ]}
+                  /> */}
+
+                </PieChart>
+
+              </ResponsiveContainer>
+
+
+              {/* =================================================
+                  DONUT CENTER
+              ================================================== */}
+
+              <div className="donut-center">
+
+                {selectedCategoryData ? (
+
+                  <>
+
                     <span>
-                      {category.name} ·{' '}
-                      {category.percent.toFixed(
-                        0
-                      )}
-                      %
+                      {
+                        selectedCategoryData.name
+                      }
                     </span>
 
                     <strong>
                       {formatCurrency(
-                        category.amount
-                      )}{' '}
-                      <ChevronRight
-                        size={14}
-                      />
+                        selectedCategoryData.amount
+                      )}
                     </strong>
 
-                  </button>
+                    <small>
+                      {selectedCategoryData.percent.toFixed(
+                        0
+                      )}
+                      % of spending
+                    </small>
 
-                )
+                  </>
+
+                ) : (
+
+                  <>
+
+                    <span>
+                      Total spent
+                    </span>
+
+                    <strong>
+                      {formatCurrency(
+                        expenses
+                      )}
+                    </strong>
+
+                    <small>
+                      This month
+                    </small>
+
+                  </>
+
+                )}
+
+              </div>
+
+            </div>
+
+
+            {/* =================================================
+                CATEGORY LIST
+
+                Selecting a row:
+                1. highlights donut sector
+                2. dims other sectors
+                3. dims other rows
+                4. navigates to transactions
+            ================================================== */}
+
+            <div className="stacked-list">
+
+              {categoryData.map(
+                category => {
+
+                  const isSelected =
+                    selectedCategory ===
+                    category.id;
+
+                  const hasSelection =
+                    selectedCategory !==
+                    null;
+
+                  return (
+
+                    <button
+                      type="button"
+
+                      className={`stat-row clickable ${
+                        isSelected
+                          ? 'category-selected'
+                          : ''
+                      } ${
+                        hasSelection &&
+                        !isSelected
+                          ? 'category-dimmed'
+                          : ''
+                      }`}
+
+                      key={
+                        category.id
+                      }
+
+                      onClick={() => {
+                        handleCategoryFilter(category.id);
+                      }}
+
+                    >
+
+                      <span>
+
+                        {category.name}
+                        {' · '}
+                        {category.percent.toFixed(
+                          0
+                        )}
+                        %
+
+                      </span>
+
+
+                      <strong>
+
+                        {formatCurrency(
+                          category.amount
+                        )}
+
+                        <ChevronRight
+                          size={14}
+                        />
+
+                      </strong>
+
+                    </button>
+
+                  );
+
+                }
               )}
 
             </div>
@@ -840,8 +1243,10 @@ export default function Home() {
         ) : (
 
           <div className="empty-inline">
+
             Categories will appear
             after you record spending.
+
           </div>
 
         )}
