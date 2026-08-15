@@ -1,6 +1,6 @@
 import { db } from './database';
 import { newId } from '../utils/id';
-import type { Account, AppSettings, Category } from '../types/models';
+import type { Account, AppSettings, Category, RecurringRule } from '../types/models';
 
 const now = new Date().toISOString();
 
@@ -57,27 +57,71 @@ function buildCategories(): Category[] {
 async function seedDemoTransactions(): Promise<void> {
   if (await db.transactions.count() > 0) return;
   const roots = await db.categories.filter(c => !c.parentId).toArray();
-  const food = roots.find(c => c.name === 'Food & Dining')?.id;
-  const transport = roots.find(c => c.name === 'Transportation')?.id;
-  const shopping = roots.find(c => c.name === 'Shopping')?.id;
-  const account = 'account-hdfc-bank';
+  const root = (name: string) => roots.find(c => c.name === name)?.id;
+  const sub = async (categoryName: string, subcategoryName: string) => {
+    const parent = root(categoryName);
+    return (await db.categories.filter(c => c.parentId === parent && c.name === subcategoryName).first())?.id;
+  };
+
+  const food = root('Food & Dining');
+  const transport = root('Transportation');
+  const shopping = root('Shopping');
+  const health = root('Health');
+  const entertainment = root('Entertainment');
+  const income = root('Income');
+  const bank = 'account-hdfc-bank';
+  const card = 'account-hdfc-card';
   const nowDate = new Date();
-  const items = [
-    { days: 2, amount: 1200, merchant: 'Demo Groceries', categoryId: food },
-    { days: 5, amount: 650, merchant: 'Demo Fuel', categoryId: transport },
-    { days: 9, amount: 2100, merchant: 'Demo Shopping', categoryId: shopping },
-    { days: 14, amount: 890, merchant: 'Demo Restaurant', categoryId: food },
-    { days: 22, amount: 1500, merchant: 'Demo Commute', categoryId: transport },
-  ];
-  for (let monthOffset = 1; monthOffset >= 0; monthOffset--) {
+
+  // Six months of deliberately varied demo activity. IDs are deterministic so
+  // the generated dataset is stable and easy to inspect while testing.
+  for (let monthOffset = 5; monthOffset >= 0; monthOffset--) {
     const base = new Date(nowDate.getFullYear(), nowDate.getMonth() - monthOffset, 1);
-    for (const item of items) {
-      const d = new Date(base.getFullYear(), base.getMonth(), Math.min(item.days, 28), 19, 0, 0);
-      await db.transactions.put({ id: newId('demo-txn'), type: 'EXPENSE', amount: item.amount, transactionDateTime: d.toISOString(), accountId: account, categoryId: item.categoryId, merchant: item.merchant, source: 'IMPORT', createdAt: d.toISOString(), updatedAt: d.toISOString(), syncStatus: 'LOCAL' });
+    const ym = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
+    const multiplier = 0.78 + ((monthOffset * 17) % 43) / 100;
+    const items = [
+      { day: 2, amount: Math.round(3200 * multiplier), merchant: 'Demo Groceries', categoryId: food, subcategoryId: await sub('Food & Dining', 'Groceries'), accountId: bank },
+      { day: 5, amount: Math.round(1400 * multiplier), merchant: 'Demo Fuel', categoryId: transport, subcategoryId: await sub('Transportation', 'Fuel'), accountId: card },
+      { day: 9, amount: Math.round(2100 * multiplier), merchant: 'Demo Shopping', categoryId: shopping, subcategoryId: await sub('Shopping', 'Online Shopping'), accountId: card },
+      { day: 14, amount: Math.round(900 * multiplier), merchant: 'Demo Restaurant', categoryId: food, subcategoryId: await sub('Food & Dining', 'Restaurants'), accountId: card },
+      { day: 18, amount: Math.round(650 * (1 + ((monthOffset + 2) % 3) * 0.25)), merchant: 'Demo Pharmacy', categoryId: health, subcategoryId: await sub('Health', 'Pharmacy'), accountId: bank },
+      { day: 22, amount: Math.round(1500 * (0.8 + ((monthOffset + 1) % 4) * 0.18)), merchant: 'Demo Commute', categoryId: transport, subcategoryId: await sub('Transportation', 'Metro/Public Transport'), accountId: bank },
+      { day: 26, amount: Math.round(1100 * (0.7 + (monthOffset % 5) * 0.22)), merchant: 'Demo Entertainment', categoryId: entertainment, subcategoryId: await sub('Entertainment', 'Movies'), accountId: card },
+    ];
+
+    for (const [index, item] of items.entries()) {
+      const d = new Date(base.getFullYear(), base.getMonth(), Math.min(item.day, 28), 10 + (index % 8), (index * 7) % 60, 0);
+      await db.transactions.put({
+        id: `demo-txn-${ym}-${index}`, type: 'EXPENSE', amount: item.amount, transactionDateTime: d.toISOString(),
+        accountId: item.accountId, categoryId: item.categoryId, subcategoryId: item.subcategoryId,
+        merchant: item.merchant, source: 'IMPORT', createdAt: d.toISOString(), updatedAt: d.toISOString(), syncStatus: 'LOCAL'
+      });
     }
-    const salary = new Date(base.getFullYear(), base.getMonth(), 1, 10, 0, 0);
-    await db.transactions.put({ id: newId('demo-income'), type: 'INCOME', amount: 85000, transactionDateTime: salary.toISOString(), accountId: account, categoryId: roots.find(c=>c.name==='Income')?.id, merchant: 'Demo Salary', source: 'IMPORT', createdAt: salary.toISOString(), updatedAt: salary.toISOString(), syncStatus: 'LOCAL' });
+
+    const salary = new Date(base.getFullYear(), base.getMonth(), 1, 9, 0, 0);
+    await db.transactions.put({
+      id: `demo-income-${ym}`, type: 'INCOME', amount: Math.round((85000 + ((monthOffset * 1250) % 6000)) * (monthOffset === 0 ? 1 : 1)),
+      transactionDateTime: salary.toISOString(), accountId: bank, categoryId: income,
+      subcategoryId: await sub('Income', 'Salary'), merchant: 'Demo Salary', source: 'IMPORT',
+      createdAt: salary.toISOString(), updatedAt: salary.toISOString(), syncStatus: 'LOCAL'
+    });
+
+    // A monthly investment contribution is kept separate from ordinary spend.
+    const investmentDate = new Date(base.getFullYear(), base.getMonth(), 12, 11, 0, 0);
+    await db.investments.put({
+      id: `demo-investment-${ym}`, date: investmentDate.toISOString(), name: 'Demo Index SIP', assetType: 'SIP',
+      type: 'CONTRIBUTION', amount: Math.round(5000 * (0.8 + (monthOffset % 4) * 0.15)), accountId: bank,
+      notes: 'Demo data', createdAt: investmentDate.toISOString(), updatedAt: investmentDate.toISOString(), syncStatus: 'LOCAL'
+    });
   }
+
+  // A few recurring rules exercise monthly, weekly and bi-weekly scheduling.
+  const rules: Array<RecurringRule> = [
+    { id: 'demo-rule-rent', name: 'Demo Rent', amount: 22000, type: 'EXPENSE', accountId: bank, categoryId: root('Housing'), subcategoryId: await sub('Housing', 'Rent'), frequency: 'MONTHLY', dayOfMonth: 5, startDate: new Date(nowDate.getFullYear(), nowDate.getMonth() - 2, 5).toISOString(), nextDueDate: new Date(nowDate.getFullYear(), nowDate.getMonth(), 5).toISOString(), active: true, createdAt: nowDate.toISOString(), updatedAt: nowDate.toISOString() },
+    { id: 'demo-rule-groceries', name: 'Demo Weekly Groceries', amount: 1200, type: 'EXPENSE', accountId: bank, categoryId: food, subcategoryId: await sub('Food & Dining', 'Groceries'), frequency: 'WEEKLY', dayOfWeek: 6, startDate: new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).toISOString(), nextDueDate: nowDate.toISOString(), active: true, createdAt: nowDate.toISOString(), updatedAt: nowDate.toISOString() },
+    { id: 'demo-rule-investment', name: 'Demo Bi-weekly Investment', amount: 2500, type: 'EXPENSE', accountId: bank, categoryId: root('Investments'), subcategoryId: await sub('Investments', 'Mutual Funds'), frequency: 'BIWEEKLY', dayOfWeek: nowDate.getDay(), startDate: new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).toISOString(), nextDueDate: nowDate.toISOString(), active: true, createdAt: nowDate.toISOString(), updatedAt: nowDate.toISOString() },
+  ];
+  await db.recurringRules.bulkPut(rules);
 }
 
 export async function ensureSeedData(): Promise<void> {

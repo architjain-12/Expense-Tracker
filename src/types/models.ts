@@ -75,6 +75,8 @@ export interface RecurringRule {
   notes?: string;
   frequency: Frequency;
   dayOfMonth?: number;
+  /** 0 = Sunday ... 6 = Saturday; used by weekly/bi-weekly rules. */
+  dayOfWeek?: number;
   startDate: string;
   endDate?: string;
   active: boolean;

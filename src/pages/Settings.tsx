@@ -7,10 +7,12 @@ import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
 import type { Account, AccountType } from '../types/models';
 import { newId } from '../utils/id';
+import packageJson from "../../package.json";
 
 export default function Settings(){
  const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
  const buildNumber = import.meta.env.VITE_BUILD_NUMBER || 'LOCAL';
+ const appVersionNumber = packageJson.version || 'X.X.X';
  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'dev';
  async function save(patch:Partial<NonNullable<typeof settings>>){const current=await db.settings.get('app');if(current)await db.settings.put({...current,...patch});}
  async function saveSheets(){await save({googleSheetsEndpoint:sheetUrl||settings?.googleSheetsEndpoint,googleSheetsToken:sheetToken||settings?.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||settings?.googleSheetsEndpoint)});setMessage('Google Sheets connection saved locally.');}
@@ -35,9 +37,29 @@ export default function Settings(){
  <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Export local data before clearing or switching devices.</p></div></div><div className="inline-actions"><button className="secondary-btn" onClick={exportBackup}><Download size={16}/> JSON</button><button className="secondary-btn" onClick={exportCsv}>CSV</button><button className="secondary-btn" onClick={exportExcel}>Excel</button><label className="secondary-btn file-btn"><FileUp size={16}/> Import JSON<input ref={fileRef} type="file" accept="application/json,.json" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Data partition</h2><p>Personal and Demo are isolated IndexedDB namespaces.</p></div></div><div className="settings-grid"><label>Active partition<input value={getActivePartition()==='demo'?'Demo':'Personal'} readOnly/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>switchPartition('demo')}>Show Demo Data</button><button className="secondary-btn" onClick={()=>switchPartition('personal')}>My Data</button><button className="danger-btn" onClick={deleteAll}><Trash2 size={15}/> Master Delete This Partition</button></div><p className="form-help">Demo mode is for showcasing the app. A PIN can be added through Device Lock, but the partition is not a substitute for encryption.</p></section>
  <section className="panel"><div className="panel-header"><div><h2>Device Lock</h2><p>Protect against accidental entry on a shared device.</p></div><Smartphone size={18}/></div>{settings?.lockEnabled?<div className="inline-actions"><span className="sync-state"><span className="status-dot online"/> Lock enabled ({settings.lockMethod})</span><button className="secondary-btn" onClick={unlock}><Unlock size={16}/> Disable</button></div>:<><div className="settings-grid"><label>PIN<input inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>setPin(e.target.value)} placeholder="4–8 digits"/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={lockPin} disabled={!pin}>Enable PIN</button>{webAuthnAvailable()&&<button className="primary-btn" onClick={lockPasskey}><ShieldCheck size={16}/> Enable Face ID / passkey</button>}</div></>}</section>
- <section className="panel"><div className="panel-header"><div><h2>About</h2><p>Expense Tracker v2.3</p></div></div><div className="empty-inline">Designed & Developed by A J · React · IndexedDB · Google Sheets · Local-first architecture</div>
- <div className="empty-inline">
-        Build #{buildNumber} · {commitSha.substring(0, 7)}
-      </div></section>
+ <section className="panel">
+  <div className="panel-header">
+    <div>
+      <h2>About</h2> <p> v{appVersionNumber}</p>
+    </div>
+  </div>
+
+  <div className="empty-inline">
+    <div className="trace-signature">
+      <strong>TRACE</strong> ✧ <strong>T</strong>rack · <strong>R</strong>ecord · <strong>A</strong>nalyze · <strong>C</strong>ategorize · <strong>E</strong>stimate
+      {/* <span className='inline'>✧</span>
+      <span className="empty-inline"> */}
+    </div>
+  </div>
+
+
+  <div className="empty-inline trace-credit">
+      Designed & Developed by A J · React · IndexedDB · Google Sheets · Local-first architecture
+    </div>
+ 
+    <div className="empty-inline">
+      Build #{buildNumber} · {commitSha.substring(0, 7)}
+    </div>
+  </section>
  </div>;
 }

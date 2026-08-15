@@ -132,7 +132,7 @@ select option { background:#15181d; }
 .amount-input-wrap span { font-size:28px; color:#7d8795; }
 .amount-input-wrap input { background:transparent; border:0; min-height:64px; font-size:56px; padding:0; outline:none; border-radius:0; width:100%; }
 .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
-.form-grid label, .settings-grid label { display:grid; gap:7px; color:#c0c5ce; font-size:12px; position:relative; }
+.form-grid label, .settings-grid label { display:grid; gap:7px; color:#c0c5ce; font-size:12px; position:relative; padding: 10px;}
 .form-grid .wide { grid-column:1 / -1; }
 .select-wrap { position:relative; }
 .select-wrap select { width:100%; appearance:none; }
@@ -181,7 +181,7 @@ select option { background:#15181d; }
 
 .settings-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:0 18px 18px; }
 .panel > label { display:grid; gap:7px; color:#c0c5ce; font-size:12px; padding:0 18px 18px; }
-.inline-actions { display:flex; gap:10px; align-items:center; padding:0 18px 18px; flex-wrap:wrap; }
+.inline-actions { display:flex; gap:10px; align-items:center; padding:10px 10px 10px; flex-wrap:wrap; }
 .warning-note { margin:0 18px 14px; padding:11px 12px; border-radius:10px; background:#241e12; border:1px solid #493d27; color:#ceb97d; font-size:11px; line-height:1.5; }
 
 .modal-backdrop { position:fixed; inset:0; background:rgba(0,0,0,.62); display:grid; place-items:center; z-index:80; padding:20px; }
@@ -219,6 +219,11 @@ select option { background:#15181d; }
   .bottom-nav { position:fixed; left:0; right:0; bottom:0; z-index:50; height:66px; background:rgba(14,16,20,.94); backdrop-filter:blur(18px); border-top:1px solid var(--border); display:grid; grid-template-columns:repeat(5,1fr); align-items:center; padding-bottom:env(safe-area-inset-bottom); }
   .bottom-item { display:grid; justify-items:center; gap:4px; color:#7d8591; font-size:9px; }
   .bottom-item.active { color:#eef0ff; }
+  .bottom-item.active svg {
+    stroke: whitesmoke; 
+    transform: scale(1.15) translateY(-3px); /* Subtly shifts active icon up */
+    transition: transform 0.2s ease;
+  }
   .bottom-add { width:46px; height:46px; border-radius:15px; border:1px solid #7180ff; background:#6471dc; color:#090b10; justify-self:center; display:grid; place-items:center; box-shadow:0 12px 25px rgba(76,88,220,.26); }
   .bottom-add.active { background:#8d99ff; }
   .review-alert { align-items:flex-start; }

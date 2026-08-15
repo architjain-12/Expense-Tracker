@@ -1,4 +1,4 @@
-# Expense Tracker PWA — v2.3
+# Expense Tracker PWA — v2.4.1
 
 A dark/light, mobile-first, local-first personal expense tracker designed primarily for iPhone Safari/Chrome and responsive desktop use.
 
@@ -629,7 +629,7 @@ More/Options focuses on:
 About section:
 
 ```text
-Expense Tracker v2.3
+Expense Tracker v2.4.1
 Designed & Developed by A J
 React · IndexedDB · Google Sheets
 ```
