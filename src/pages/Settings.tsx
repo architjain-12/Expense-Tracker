@@ -47,8 +47,6 @@ export default function Settings(){
   <div className="empty-inline">
     <div className="trace-signature">
       <strong>TRACE</strong> ✧ <strong>T</strong>rack · <strong>R</strong>ecord · <strong>A</strong>nalyze · <strong>C</strong>ategorize · <strong>E</strong>stimate
-      {/* <span className='inline'>✧</span>
-      <span className="empty-inline"> */}
     </div>
   </div>
 
