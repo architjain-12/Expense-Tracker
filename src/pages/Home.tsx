@@ -968,109 +968,52 @@ export default function Home() {
 
                 <PieChart>
 
-                  <Pie
-                    data={categoryData}
-                    dataKey="amount"
-                    nameKey="name"
+                <Pie
+                  data={categoryData}
+                  dataKey="amount"
+                  nameKey="name"
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="52%"
+                  outerRadius="72%"
+                  paddingAngle={2}
+                  stroke="none"
+                  isAnimationActive={false}
+                  onClick={(_, index) => {
+                    const category = categoryData[index];
 
-                    cx="50%"
-                    cy="50%"
+                    if (!category) {
+                      return;
+                    }
 
-                    innerRadius="52%"
-                    outerRadius="72%"
+                    handleCategorySelect(category.id);
+                  }}
+                >
+                  {categoryData.map((category, index) => {
+                    const isSelected =
+                      selectedCategory === category.id;
 
-                    paddingAngle={2}
+                    const hasSelection =
+                      selectedCategory !== null;
 
-                    stroke="none"
-
-                    isAnimationActive={false}
-
-                    /*
-                     * IMPORTANT:
-                     *
-                     * We do NOT use activeShape.
-                     *
-                     * This prevents Recharts from
-                     * drawing a bordered/expanded
-                     * sector when tapping on mobile.
-                     */
-
-                    activeIndex={-1}
-
-                    onClick={(
-                      _,
-                      index
-                    ) => {
-
-                      const category =
-                        categoryData[
-                          index
-                        ];
-
-                      if (!category) {
-                        return;
-                      }
-
-                      handleCategorySelect(
-                        category.id
-                      );
-
-                    }}
-                  >
-
-                    {categoryData.map(
-                      (
-                        category,
-                        index
-                      ) => {
-
-                        const isSelected =
-                          selectedCategory ===
-                          category.id;
-
-                        const hasSelection =
-                          selectedCategory !==
-                          null;
-
-                        return (
-
-                          <Cell
-                            key={
-                              category.id
-                            }
-
-                            fill={
-                              PIE_COLORS[
-                                index %
-                                  PIE_COLORS.length
-                              ]
-                            }
-
-                            stroke="none"
-
-                            /*
-                             * Selected category
-                             * stays fully visible.
-                             *
-                             * Other categories
-                             * become slightly dim.
-                             */
-
-                            opacity={
-                              hasSelection &&
-                              !isSelected
-                                ? 0.30
-                                : 1
-                            }
-
-                          />
-
-                        );
-
-                      }
-                    )}
-
-                  </Pie>
+                    return (
+                      <Cell
+                        key={category.id}
+                        fill={
+                          PIE_COLORS[
+                            index % PIE_COLORS.length
+                          ]
+                        }
+                        stroke="none"
+                        opacity={
+                          hasSelection && !isSelected
+                            ? 0.30
+                            : 1
+                        }
+                      />
+                    );
+                  })}
+                </Pie>
 
 
                   {/* =================================================
