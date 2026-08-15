@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ChevronRight, PieChart as PieIcon } from 'lucide-react';
 import { useTransactions, useAccounts, useCategories, useReviewQueue, useBudgets, useRecurringRules, useSettings } from '../hooks/useDb';
-import { getRecurringOccurrencesForMonth } from '../services/recurringService';
+import { getRecurringOccurrencesForMonth, toDateKey } from '../services/recurringService';
 import { formatCurrency } from '../utils/format';
 import { useMemo, useState } from 'react';
 import TransactionList from '../components/TransactionList';
@@ -24,44 +24,42 @@ export default function Home(){
   );
 
   return occurrences
-  .map((occurrence) => {
-    const dueDate = occurrence.dueDate;
+    .map(occurrence => {
+      const day = toDateKey(occurrence.dueDate);
 
-    const day =
-      `${dueDate.getFullYear()}-${String(dueDate.getMonth() + 1).padStart(2, "0")}-${String(dueDate.getDate()).padStart(2, "0")}`;
+      const externalId = `${occurrence.rule.id}:${day}`;
 
-    const externalId = `${occurrence.rule.id}:${day}`;
+      const alreadyInReviewQueue = reviewQueue.some(
+        q =>
+          q.externalId === externalId &&
+          q.status !== 'DISCARDED'
+      );
 
-    const alreadyInReviewQueue = reviewQueue.some(
-      q =>
-        q.externalId === externalId &&
-        q.status !== "DISCARDED"
+      const alreadyRecorded = transactions.some(
+        t =>
+          t.recurringRuleId === occurrence.rule.id &&
+          t.transactionDateTime.slice(0, 10) === day
+      );
+
+      if (alreadyInReviewQueue || alreadyRecorded) {
+        return null;
+      }
+
+      return {
+        id: externalId,
+        externalId,
+        ruleId: occurrence.rule.id,
+        name: occurrence.rule.name || 'Recurring payment',
+        amount: Number(occurrence.rule.amount || 0),
+        dueDate: occurrence.dueDate,
+        type: 'RECURRING' as const,
+      };
+    })
+    .filter(
+      (item): item is NonNullable<typeof item> =>
+        item !== null
     );
-
-    const alreadyRecorded = transactions.some(
-      t =>
-        t.recurringRuleId === occurrence.rule.id &&
-        t.transactionDateTime.slice(0, 10) === day
-    );
-
-    if (alreadyInReviewQueue || alreadyRecorded) {
-      return null;
-    }
-
-    return {
-      id: externalId,
-      externalId,
-      ruleId: occurrence.rule.id,
-      name: occurrence.rule.name || "Recurring payment",
-      amount: Number(occurrence.rule.amount || 0),
-      dueDate,
-      type: "RECURRING" as const
-    };
-  })
-  .filter(
-    (item): item is NonNullable<typeof item> => item !== null
-  );
-  }, [recurring, reviewQueue, transactions, monthKey]);
+}, [recurring, reviewQueue, transactions, monthKey]);
   const estimatedDues = useMemo(
     () =>
       estimatedDueItems.reduce(

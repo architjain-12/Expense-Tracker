@@ -5,6 +5,7 @@ import {
   addYears,
   endOfMonth,
   isBefore,
+  isAfter,
   isEqual,
   parseISO,
   startOfDay,
@@ -98,28 +99,73 @@ export function getRecurringOccurrencesForMonth(
 ): Array<{ rule: RecurringRule; dueDate: Date }> {
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
-  const effectiveEnd = monthStart.getTime() === startOfMonth(today).getTime()
-    ? new Date(Math.min(monthEnd.getTime(), today.getTime()))
-    : monthEnd;
+  const todayStart = startOfDay(today);
+
+  const isCurrentMonth =
+    monthStart.getTime() === startOfMonth(today).getTime();
+
+  const isPastMonth = isBefore(monthEnd, todayStart);
+
+  // No estimated dues for a completely past month.
+  if (isPastMonth) {
+    return [];
+  }
+
+  const tomorrow = addDays(todayStart, 1);
+
+  const calculationStart = isCurrentMonth
+    ? tomorrow
+    : monthStart;
+
   const result: Array<{ rule: RecurringRule; dueDate: Date }> = [];
 
   for (const rule of rules) {
     if (!rule.active) continue;
-    const ruleStart = startOfDay(parseISO(rule.startDate));
-    const configuredEnd = rule.endDate ? startOfDay(parseISO(rule.endDate)) : undefined;
-    if (configuredEnd && isBefore(configuredEnd, monthStart)) continue;
 
-    const pointer = startOfDay(parseISO(rule.nextDueDate));
-    const from = new Date(Math.max(pointer.getTime(), ruleStart.getTime(), monthStart.getTime()));
+    const ruleStart = startOfDay(parseISO(rule.startDate));
+
+    const configuredEnd = rule.endDate
+      ? startOfDay(parseISO(rule.endDate))
+      : undefined;
+
+    if (
+      configuredEnd &&
+      isBefore(configuredEnd, calculationStart)
+    ) {
+      continue;
+    }
+
+    const from = new Date(
+      Math.max(
+        calculationStart.getTime(),
+        ruleStart.getTime()
+      )
+    );
+
     let due = firstOccurrenceOnOrAfter(rule, from);
     let guard = 0;
-    while (!isBefore(effectiveEnd, due) && guard++ < 500) {
-      if ((!configuredEnd || !isBefore(configuredEnd, due)) && !isBefore(due, ruleStart)) {
-        result.push({ rule, dueDate: due });
+
+    while (
+      !isAfter(due, monthEnd) &&
+      guard++ < 500
+    ) {
+      if (
+        !isBefore(due, calculationStart) &&
+        !isBefore(due, ruleStart) &&
+        (!configuredEnd || !isAfter(due, configuredEnd))
+      ) {
+        result.push({
+          rule,
+          dueDate: due,
+        });
       }
-      due = startOfDay(parseISO(calculateNextDue(rule, due)));
+
+      due = startOfDay(
+        parseISO(calculateNextDue(rule, due))
+      );
     }
   }
+
   return result;
 }
 
@@ -184,4 +230,12 @@ export async function processDueRecurringTransactions(now = new Date()): Promise
   }
 
   return queued;
+}
+
+export function toDateKey(date: Date): string {
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-');
 }
