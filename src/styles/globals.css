@@ -2124,3 +2124,497 @@ select option {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* =========================================================
+   HOMEPAGE COMPACT FINANCIAL DASHBOARD
+   Homepage-specific styles only.
+   Does not modify shared components globally.
+   ========================================================= */
+
+   .home-page {
+    gap: 14px;
+  }
+  
+  .home-header {
+    display: grid;
+    gap: 2px;
+  }
+  
+  .home-header h1 {
+    margin: 2px 0 2px;
+  }
+  
+  .home-budget-card {
+    padding-bottom: 12px;
+  }
+  
+  .home-budget-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 15px 18px 12px;
+  }
+  
+  .home-section-label {
+    display: block;
+    color: var(--muted);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    font-weight: 750;
+    margin-bottom: 5px;
+  }
+  
+  .home-budget-remaining {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  
+  .home-budget-remaining strong {
+    font-size: 21px;
+    letter-spacing: -.035em;
+  }
+  
+  .home-budget-remaining > span {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  
+  .home-budget-remaining .home-budget-total {
+    color: #707887;
+    font-size: 13px;
+  }
+  
+  .home-budget-percent {
+    color: var(--muted);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  
+  /* Combined budget bar */
+  
+  .home-combined-budget {
+    position: relative;
+    height: 11px;
+    margin: 0 18px;
+    border-radius: 999px;
+    background: #242932;
+    overflow: hidden;
+  }
+  
+  .home-combined-budget span {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    display: block;
+    transition:
+      width .25s ease,
+      left .25s ease;
+  }
+  
+  .home-budget-spent-segment {
+    left: 0;
+    background: var(--accent);
+  }
+  
+  .home-budget-dues-segment {
+    background: var(--warning);
+  }
+  
+  /* Labels underneath the combined bar */
+  
+  .home-budget-labels {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 7px 18px 0;
+    color: var(--muted);
+    font-size: 10px;
+  }
+  
+  .home-budget-labels > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  
+  .home-budget-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    flex: 0 0 auto;
+  }
+  
+  .home-budget-dot.spent {
+    background: var(--accent);
+  }
+  
+  .home-budget-dot.dues {
+    background: var(--warning);
+  }
+  
+  
+  /* =========================================================
+     IMPORTANT FINANCIAL NUMBERS
+     ========================================================= */
+  
+  .home-financial-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+  }
+  
+  .home-financial-summary .metric-card {
+    min-height: 82px;
+    padding: 13px 15px;
+    gap: 5px;
+  }
+  
+  .home-financial-summary .metric-card span {
+    font-size: 10px;
+  }
+  
+  .home-financial-summary .metric-card strong {
+    font-size: 20px;
+  }
+  
+  
+  /* =========================================================
+     PENDING REVIEW
+     ========================================================= */
+  
+  .home-review-alert {
+    min-height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 11px;
+  
+    padding: 10px 13px;
+  
+    border-radius: 13px;
+  
+    background: #211b12;
+    border: 1px solid #4a3d26;
+  
+    color: inherit;
+  
+    transition:
+      background .15s ease,
+      border-color .15s ease;
+  }
+  
+  .home-review-alert:hover {
+    background: #292216;
+    border-color: #63512e;
+  }
+  
+  .home-review-icon {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  
+    display: grid;
+    place-items: center;
+  
+    flex: 0 0 auto;
+  
+    background: #382b17;
+    color: #f2c96e;
+  }
+  
+  .home-review-content {
+    min-width: 0;
+    flex: 1;
+  
+    display: grid;
+    gap: 2px;
+  }
+  
+  .home-review-content strong {
+    font-size: 12px;
+    color: #f5ead0;
+  }
+  
+  .home-review-content span {
+    color: #bcae88;
+    font-size: 10px;
+  }
+  
+  .home-review-arrow {
+    color: #a99768;
+    flex: 0 0 auto;
+  }
+  
+  
+  /* =========================================================
+     ESTIMATED DUES
+     ========================================================= */
+  
+  .home-dues-card {
+    overflow: hidden;
+  }
+  
+  .home-dues-header {
+    width: 100%;
+  
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 15px;
+  
+    padding: 14px 18px 10px;
+  
+    border: 0;
+    background: transparent;
+    color: inherit;
+  
+    text-align: left;
+  }
+  
+  .home-dues-header:hover {
+    background: rgba(255,255,255,.015);
+  }
+  
+  .home-dues-title {
+    min-width: 0;
+  }
+  
+  .home-dues-title h2 {
+    margin: 0;
+    font-size: 14px;
+  }
+  
+  .home-dues-title p {
+    margin: 3px 0 0;
+    color: var(--muted);
+    font-size: 10px;
+  }
+  
+  .home-dues-summary {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    white-space: nowrap;
+  }
+  
+  .home-dues-summary strong {
+    color: var(--warning);
+    font-size: 14px;
+  }
+  
+  .home-dues-summary svg {
+    color: var(--muted);
+    transition: transform .18s ease;
+  }
+  
+  .home-dues-summary svg.home-chevron-open {
+    transform: rotate(180deg);
+  }
+  
+  .home-dues-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  
+    padding: 0 18px 11px;
+  
+    color: var(--muted);
+    font-size: 10px;
+  }
+  
+  .home-dues-footer span:last-child {
+    color: #7e8794;
+  }
+  
+  .home-dues-card .estimated-dues-list {
+    margin-top: 0;
+    padding: 0 12px 12px;
+  }
+  
+  .home-dues-card .estimated-due-item {
+    padding: 10px 12px;
+  }
+  
+  
+  /* =========================================================
+     RECENT TRANSACTIONS
+     ========================================================= */
+  
+  .home-recent-card .panel-header {
+    padding-bottom: 9px;
+  }
+  
+  
+  /* =========================================================
+     CATEGORY CHART
+     ========================================================= */
+  
+  .home-category-card .panel-header {
+    padding-bottom: 5px;
+  }
+  
+  .home-pie-chart {
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  
+  
+  /* =========================================================
+     TABLET
+     ========================================================= */
+  
+  @media (max-width: 720px) {
+  
+    .home-page {
+      gap: 11px;
+    }
+  
+    .home-header h1 {
+      font-size: 27px;
+    }
+  
+    .home-budget-header {
+      padding: 13px 14px 10px;
+    }
+  
+    .home-budget-remaining strong {
+      font-size: 19px;
+    }
+  
+    .home-combined-budget {
+      margin: 0 14px;
+    }
+  
+    .home-budget-labels {
+      padding-left: 14px;
+      padding-right: 14px;
+      gap: 6px;
+    }
+  
+    .home-budget-labels > span {
+      font-size: 9px;
+    }
+  
+    .home-financial-summary {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 7px;
+    }
+  
+    .home-financial-summary .metric-card {
+      min-height: 73px;
+      padding: 10px 8px;
+    }
+  
+    .home-financial-summary .metric-card span {
+      font-size: 9px;
+    }
+  
+    .home-financial-summary .metric-card strong {
+      font-size: 15px;
+    }
+  
+    .home-review-alert {
+      min-height: 54px;
+      padding: 9px 11px;
+    }
+  
+    .home-review-content span {
+      font-size: 9px;
+    }
+  
+    .home-dues-header {
+      padding: 12px 14px 8px;
+    }
+  
+    .home-dues-footer {
+      padding-left: 14px;
+      padding-right: 14px;
+    }
+  
+    .home-dues-card .estimated-dues-list {
+      padding-left: 10px;
+      padding-right: 10px;
+    }
+  
+  }
+  
+  
+  /* =========================================================
+     VERY SMALL PHONES
+     ========================================================= */
+  
+  @media (max-width: 460px) {
+  
+    .home-budget-remaining {
+      gap: 4px;
+    }
+  
+    .home-budget-remaining strong {
+      font-size: 17px;
+    }
+  
+    .home-budget-remaining > span {
+      font-size: 10px;
+    }
+  
+    .home-budget-remaining .home-budget-total {
+      font-size: 11px;
+    }
+  
+    .home-budget-percent {
+      font-size: 10px;
+    }
+  
+    .home-budget-labels > span:last-child {
+      display: none;
+    }
+  
+    .home-financial-summary .metric-card strong {
+      font-size: 14px;
+    }
+  
+    .home-financial-summary .metric-card span {
+      font-size: 8px;
+    }
+  
+    .home-review-content span {
+      display: none;
+    }
+  
+  }
+  .spending-donut {
+    position: relative;
+    height: 280px;
+    padding: 0;
+  }
+  
+  .spending-donut .recharts-responsive-container {
+    position: relative;
+    z-index: 1;
+  }
+  
+  .donut-center {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    display: grid;
+    gap: 4px;
+    text-align: center;
+    pointer-events: none;
+  }
+  
+  .donut-center span {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  
+  .donut-center strong {
+    color: var(--text);
+    font-size: 20px;
+    letter-spacing: -0.03em;
+  }
