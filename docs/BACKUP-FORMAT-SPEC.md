@@ -51,12 +51,16 @@ Encrypted archives should use a standard authenticated encryption design.
 Initial direction:
 
 - AES-256-GCM for authenticated encryption;
-- Argon2id for deriving an encryption key from a human recovery secret/passphrase;
+- Argon2id is the target password KDF for the frozen long-term format;
 - cryptographically random salt;
 - cryptographically random nonce/IV;
 - parameters recorded in the archive header/manifest as required for future recovery.
 
-The final parameter set must be explicitly documented and tested before implementation.
+### v2.4.1 browser implementation note
+
+The first Phase 0 implementation uses the browser-native **PBKDF2-HMAC-SHA-256** KDF because Web Crypto does not provide Argon2id and the supplied v2.4.1 project does not currently bundle an Argon2 WASM implementation. The archive records the KDF and parameters explicitly.
+
+This is an implementation profile, not a claim that the long-term ETAR-1 cryptographic profile is frozen. Before the archive format is declared final for lifetime storage, the KDF profile should be upgraded to Argon2id (or a separately versioned profile should be formally retained) and interoperability tests should be added.
 
 ## Recovery key
 

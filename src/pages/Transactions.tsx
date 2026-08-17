@@ -1,3 +1,4 @@
+import { getEffectiveBudget } from '../services/budgetService';
 import { useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight, Search, X } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
@@ -88,9 +89,7 @@ export default function Transactions() {
 
     const budgets = useBudgets();
 
-    const overallBudget = budgets.find(
-    b => !b.categoryId && b.period === "MONTHLY"
-    );
+    const overallBudget = getEffectiveBudget(budgets, undefined, "MONTHLY", new Date());
 
     const budget = Number(overallBudget?.amount || 0);
 

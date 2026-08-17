@@ -75,7 +75,7 @@ async function seedDemoTransactions(): Promise<void> {
 
   // Six months of deliberately varied demo activity. IDs are deterministic so
   // the generated dataset is stable and easy to inspect while testing.
-  for (let monthOffset = 5; monthOffset >= 0; monthOffset--) {
+  for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
     const base = new Date(nowDate.getFullYear(), nowDate.getMonth() - monthOffset, 1);
     const ym = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`;
     const multiplier = 0.78 + ((monthOffset * 17) % 43) / 100;
@@ -87,6 +87,11 @@ async function seedDemoTransactions(): Promise<void> {
       { day: 18, amount: Math.round(650 * (1 + ((monthOffset + 2) % 3) * 0.25)), merchant: 'Demo Pharmacy', categoryId: health, subcategoryId: await sub('Health', 'Pharmacy'), accountId: bank },
       { day: 22, amount: Math.round(1500 * (0.8 + ((monthOffset + 1) % 4) * 0.18)), merchant: 'Demo Commute', categoryId: transport, subcategoryId: await sub('Transportation', 'Metro/Public Transport'), accountId: bank },
       { day: 26, amount: Math.round(1100 * (0.7 + (monthOffset % 5) * 0.22)), merchant: 'Demo Entertainment', categoryId: entertainment, subcategoryId: await sub('Entertainment', 'Movies'), accountId: card },
+      { day: 7, amount: Math.round(1800 * (0.7 + ((monthOffset + 2) % 5) * 0.18)), merchant: 'Demo Cafe & Delivery', categoryId: food, subcategoryId: await sub('Food & Dining', monthOffset % 2 ? 'Food Delivery' : 'Cafes'), accountId: card },
+      { day: 11, amount: Math.round(2400 * (0.65 + ((monthOffset + 1) % 6) * 0.16)), merchant: 'Demo Family Support', categoryId: root('Family'), subcategoryId: await sub('Family', 'Parents'), accountId: bank },
+      { day: 16, amount: Math.round(1700 * (0.7 + (monthOffset % 4) * 0.2)), merchant: 'Demo Personal', categoryId: root('Personal'), subcategoryId: await sub('Personal', monthOffset % 2 ? 'Personal Care' : 'Hobbies'), accountId: card },
+      { day: 20, amount: Math.round(950 * (0.6 + ((monthOffset + 3) % 5) * 0.22)), merchant: 'Demo Utility', categoryId: root('Housing'), subcategoryId: await sub('Housing', monthOffset % 2 ? 'Electricity' : 'Internet'), accountId: bank },
+      { day: 24, amount: Math.round(3200 * (0.5 + ((monthOffset + 1) % 5) * 0.3)), merchant: monthOffset % 4 === 0 ? 'Demo Weekend Trip' : 'Demo Shopping', categoryId: monthOffset % 4 === 0 ? root('Travel') : shopping, subcategoryId: await sub(monthOffset % 4 === 0 ? 'Travel' : 'Shopping', monthOffset % 4 === 0 ? 'Activities' : 'Electronics'), accountId: card },
     ];
 
     for (const [index, item] of items.entries()) {
@@ -115,6 +120,17 @@ async function seedDemoTransactions(): Promise<void> {
     });
   }
 
+  // Budget history demonstrates that changing a budget creates a new effective period rather than rewriting older months.
+  const budgetRoot = root('Food & Dining');
+  for (let monthOffset = 11; monthOffset >= 0; monthOffset--) {
+    const base = new Date(nowDate.getFullYear(), nowDate.getMonth() - monthOffset, 1);
+    const start = base.toISOString();
+    const end = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59, 999).toISOString();
+    const monthlyAmount = 52000 + ((monthOffset * 1800) % 9000);
+    await db.budgets.put({ id: `demo-budget-overall-${ymKey(base)}`, amount: monthlyAmount, period: 'MONTHLY', startDate: start, endDate: end, createdAt: start, updatedAt: start });
+    await db.budgets.put({ id: `demo-budget-food-${ymKey(base)}`, categoryId: budgetRoot, amount: 10000 + ((monthOffset * 500) % 2500), period: 'MONTHLY', startDate: start, endDate: end, createdAt: start, updatedAt: start });
+  }
+
   // A few recurring rules exercise monthly, weekly and bi-weekly scheduling.
   const rules: Array<RecurringRule> = [
     { id: 'demo-rule-rent', name: 'Demo Rent', amount: 22000, type: 'EXPENSE', accountId: bank, categoryId: root('Housing'), subcategoryId: await sub('Housing', 'Rent'), frequency: 'MONTHLY', dayOfMonth: 5, startDate: new Date(nowDate.getFullYear(), nowDate.getMonth() - 2, 5).toISOString(), nextDueDate: new Date(nowDate.getFullYear(), nowDate.getMonth(), 5).toISOString(), active: true, createdAt: nowDate.toISOString(), updatedAt: nowDate.toISOString() },
@@ -122,6 +138,18 @@ async function seedDemoTransactions(): Promise<void> {
     { id: 'demo-rule-investment', name: 'Demo Bi-weekly Investment', amount: 2500, type: 'EXPENSE', accountId: bank, categoryId: root('Investments'), subcategoryId: await sub('Investments', 'Mutual Funds'), frequency: 'BIWEEKLY', dayOfWeek: nowDate.getDay(), startDate: new Date(nowDate.getFullYear(), nowDate.getMonth(), 1).toISOString(), nextDueDate: nowDate.toISOString(), active: true, createdAt: nowDate.toISOString(), updatedAt: nowDate.toISOString() },
   ];
   await db.recurringRules.bulkPut(rules);
+}
+
+function ymKey(date: Date): string { return `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`; }
+
+export async function resetDemoData(): Promise<void> {
+  if (typeof localStorage === 'undefined' || localStorage.getItem('expense-tracker-active-partition') !== 'demo') throw new Error('Demo reset is only available in the Demo partition.');
+  await db.transaction('rw', [db.transactions, db.accounts, db.categories, db.recurringRules, db.reviewQueue, db.budgets, db.investments, db.interestDeposits, db.syncQueue, db.settings], async () => {
+    await db.transactions.clear(); await db.accounts.clear(); await db.categories.clear(); await db.recurringRules.clear(); await db.reviewQueue.clear(); await db.budgets.clear(); await db.investments.clear(); await db.interestDeposits.clear(); await db.syncQueue.clear(); await db.settings.clear();
+    await db.accounts.bulkAdd(defaultAccounts); await db.categories.bulkAdd(buildCategories());
+    await db.settings.put({ id: 'app', currency: 'INR', defaultAccountId: 'account-hdfc-bank', theme: 'dark', reportingYear: 'FY', googleSheetsEnabled: false });
+  });
+  await seedDemoTransactions();
 }
 
 export async function ensureSeedData(): Promise<void> {

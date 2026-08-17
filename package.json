@@ -2,6 +2,7 @@
   "name": "expense-tracker-pwa",
   "private": true,
   "version": "2.4.1",
+  "description": "TRACE v2.4.1 - Phase 0",
   "type": "module",
   "scripts": {
     "dev": "vite",

@@ -1,6 +1,6 @@
 # Phase 0 — Target Architecture & Migration Plan
 
-Status: **DESIGN ONLY — v2.4.0 baseline**
+Status: **Phase 0 implementation started on v2.4.1**
 
 This document defines the approved-direction architecture for the Expense Tracker. It does not change runtime behavior.
 
@@ -323,7 +323,7 @@ Google Sheets becomes an optional integration/export rather than the database.
 Finish and stabilize current financial functionality. No backend rewrite.
 
 ### v2.5
-Backup and disaster recovery:
+Backup and disaster recovery (initial local implementation now landed in v2.4.1):
 - portable archive;
 - encryption/recovery key;
 - local backup;

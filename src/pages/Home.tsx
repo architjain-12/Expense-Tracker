@@ -1,3 +1,4 @@
+import { getEffectiveBudget } from '../services/budgetService';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   AlertCircle,
@@ -138,11 +139,7 @@ export default function Home() {
 
   const overallBudget = useMemo(
     () =>
-      budgets.find(
-        b =>
-          !b.categoryId &&
-          b.period === 'MONTHLY'
-      ),
+      getEffectiveBudget(budgets, undefined, 'MONTHLY', new Date()),
     [budgets]
   );
 
