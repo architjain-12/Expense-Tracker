@@ -1,5 +1,19 @@
-import { db } from '../db/database';
-import type { AppSettings } from '../types/models';
+import { db, 
+  restoreTransferDb,
+  getActivePartition,
+  type DataPartition, } from '../db/database';
+  import type {
+    AppSettings,
+    Account,
+    Category,
+    RecurringRule,
+    ReviewQueueItem,
+    Budget,
+    InvestmentEntry,
+    InterestDeposit,
+    PendingRestore,
+    Transaction
+  } from '../types/models';
 
 export const ETAR_FORMAT = 'ETAR-1';
 export const ETAR_SCHEMA_VERSION = 1;
@@ -76,6 +90,8 @@ export type ArchiveManifest = {
   checksum: string;
   storageMode?: 'shared' | 'downloaded';
 };
+
+export type RestoreMode = 'merge' | 'replace';
 
 function toBufferSource(bytes: Uint8Array): BufferSource {
   return bytes as unknown as BufferSource;
@@ -266,7 +282,8 @@ function validateSnapshot(data: unknown): asserts data is Snapshot {
 
 export async function restoreEncryptedArchive(
   file: File,
-  password: string
+  password: string,
+  mode: RestoreMode = 'merge'
 ): Promise<ArchiveManifest> {
   if (!password) {
     throw new Error('Backup password is required.');
@@ -287,7 +304,9 @@ export async function restoreEncryptedArchive(
   try {
     envelope = JSON.parse(await file.text());
   } catch {
-    throw new Error('The selected file is not a valid Expense Tracker archive.');
+    throw new Error(
+      'The selected file is not a valid Expense Tracker archive.'
+    );
   }
 
   if (
@@ -304,15 +323,24 @@ export async function restoreEncryptedArchive(
     envelope.encryption.algorithm !== 'AES-256-GCM' ||
     envelope.encryption.kdf !== 'PBKDF2-SHA-256'
   ) {
-    throw new Error('Unsupported archive encryption parameters.');
+    throw new Error(
+      'Unsupported archive encryption parameters.'
+    );
   }
 
-  if (!envelope.encryption.salt || !envelope.encryption.iv) {
-    throw new Error('Backup encryption metadata is incomplete.');
+  if (
+    !envelope.encryption.salt ||
+    !envelope.encryption.iv
+  ) {
+    throw new Error(
+      'Backup encryption metadata is incomplete.'
+    );
   }
 
   if (!envelope.ciphertext) {
-    throw new Error('Backup ciphertext is missing.');
+    throw new Error(
+      'Backup ciphertext is missing.'
+    );
   }
 
   let salt: Uint8Array;
@@ -324,7 +352,9 @@ export async function restoreEncryptedArchive(
     iv = base64ToBytes(envelope.encryption.iv);
     ciphertext = base64ToBytes(envelope.ciphertext);
   } catch {
-    throw new Error('Backup contains invalid encrypted data.');
+    throw new Error(
+      'Backup contains invalid encrypted data.'
+    );
   }
 
   if (salt.byteLength !== 16) {
@@ -332,11 +362,15 @@ export async function restoreEncryptedArchive(
   }
 
   if (iv.byteLength !== 12) {
-    throw new Error('Invalid backup initialization vector.');
+    throw new Error(
+      'Invalid backup initialization vector.'
+    );
   }
 
   if (ciphertext.byteLength === 0) {
-    throw new Error('Backup ciphertext is empty.');
+    throw new Error(
+      'Backup ciphertext is empty.'
+    );
   }
 
   const key = await deriveKey(password, salt);
@@ -352,18 +386,25 @@ export async function restoreEncryptedArchive(
       key,
       toBufferSource(ciphertext)
     );
-  
+
     plaintext = text(clear);
   } catch (error) {
-    console.error('AES-GCM decrypt failed:', error);
-  
+    console.error(
+      'AES-GCM decrypt failed:',
+      error
+    );
+
     if (error instanceof Error) {
       throw new Error(
-        `AES-GCM decrypt failed [${error.name}]: ${error.message || 'No message'}`
+        `AES-GCM decrypt failed [${error.name}]: ${
+          error.message || 'No message'
+        }`
       );
     }
-  
-    throw new Error(`AES-GCM decrypt failed: ${String(error)}`);
+
+    throw new Error(
+      `AES-GCM decrypt failed: ${String(error)}`
+    );
   }
 
   let data: Snapshot & {
@@ -382,7 +423,9 @@ export async function restoreEncryptedArchive(
 
   const checksum = await sha256(plaintext);
 
-  if (checksum !== envelope.manifest.checksum) {
+  if (
+    checksum !== envelope.manifest.checksum
+  ) {
     throw new Error(
       'Backup integrity check failed. The archive may be corrupted or modified.'
     );
@@ -390,12 +433,66 @@ export async function restoreEncryptedArchive(
 
   validateSnapshot(data);
 
-  await restoreSnapshot(data);
+  await restoreSnapshot(data, mode);
 
   return envelope.manifest;
 }
 
-export async function restoreSnapshot(data: Snapshot): Promise<void> {
+type MergeableRecord = {
+  id: string;
+  updatedAt?: string;
+  deletedAt?: string;
+};
+
+function mergeRecords<T extends MergeableRecord>(
+  current: T[],
+  incoming: T[]
+): T[] {
+  const result = new Map<string, T>();
+
+  for (const record of current) {
+    result.set(record.id, record);
+  }
+
+  for (const incomingRecord of incoming) {
+    const currentRecord =
+      result.get(incomingRecord.id);
+
+    if (!currentRecord) {
+      result.set(
+        incomingRecord.id,
+        incomingRecord
+      );
+      continue;
+    }
+
+    const incomingTime = incomingRecord.updatedAt
+      ? new Date(
+          incomingRecord.updatedAt
+        ).getTime()
+      : 0;
+
+    const currentTime = currentRecord.updatedAt
+      ? new Date(
+          currentRecord.updatedAt
+        ).getTime()
+      : 0;
+
+    if (incomingTime >= currentTime) {
+      result.set(
+        incomingRecord.id,
+        incomingRecord
+      );
+    }
+  }
+
+  return Array.from(result.values());
+}
+
+export async function restoreSnapshot(
+  data: Snapshot,
+  mode: RestoreMode = 'merge'
+): Promise<void> {
   validateSnapshot(data);
 
   await db.transaction(
@@ -413,73 +510,192 @@ export async function restoreSnapshot(data: Snapshot): Promise<void> {
       db.settings,
     ],
     async () => {
-      // ----------------------------------------------------------
-      // Preserve device-local settings before clearing the DB.
-      // ----------------------------------------------------------
-
-      const currentSettings = await db.settings.get('app');
+      const currentSettings =
+        await db.settings.get('app');
 
       const preservedDeviceSettings: Partial<AppSettings> = {
-        demoPinHash: currentSettings?.demoPinHash,
-        lockEnabled: currentSettings?.lockEnabled,
-        lockMethod: currentSettings?.lockMethod,
-        passkeyCredentialId: currentSettings?.passkeyCredentialId,
-        localPinHash: currentSettings?.localPinHash,
+        demoPinHash:
+          currentSettings?.demoPinHash,
 
-        // Google Sheets token is a credential.
-        googleSheetsToken: currentSettings?.googleSheetsToken,
+        lockEnabled:
+          currentSettings?.lockEnabled,
+
+        lockMethod:
+          currentSettings?.lockMethod,
+
+        passkeyCredentialId:
+          currentSettings?.passkeyCredentialId,
+
+        localPinHash:
+          currentSettings?.localPinHash,
+
+        googleSheetsToken:
+          currentSettings?.googleSheetsToken,
       };
 
-      // ----------------------------------------------------------
-      // Clear portable application data.
-      // ----------------------------------------------------------
+      if (mode === 'replace') {
+        await db.transactions.clear();
+        await db.accounts.clear();
+        await db.categories.clear();
+        await db.recurringRules.clear();
+        await db.reviewQueue.clear();
+        await db.budgets.clear();
+        await db.investments.clear();
+        await db.interestDeposits.clear();
+        await db.syncQueue.clear();
 
-      await db.transactions.clear();
-      await db.accounts.clear();
-      await db.categories.clear();
-      await db.recurringRules.clear();
-      await db.reviewQueue.clear();
-      await db.budgets.clear();
-      await db.investments.clear();
-      await db.interestDeposits.clear();
-      await db.syncQueue.clear();
-      await db.settings.clear();
+        await db.transactions.bulkPut(
+          data.transactions as never[]
+        );
 
-      // ----------------------------------------------------------
-      // Restore portable application data.
-      // ----------------------------------------------------------
+        await db.accounts.bulkPut(
+          data.accounts as never[]
+        );
 
-      await db.transactions.bulkPut(data.transactions as never[]);
-      await db.accounts.bulkPut(data.accounts as never[]);
-      await db.categories.bulkPut(data.categories as never[]);
-      await db.recurringRules.bulkPut(
-        data.recurringRules as never[]
-      );
-      await db.reviewQueue.bulkPut(
-        data.reviewQueue as never[]
-      );
-      await db.budgets.bulkPut(data.budgets as never[]);
-      await db.investments.bulkPut(data.investments as never[]);
-      await db.interestDeposits.bulkPut(
-        data.interestDeposits as never[]
-      );
+        await db.categories.bulkPut(
+          data.categories as never[]
+        );
 
-      // ----------------------------------------------------------
-      // Restore portable settings + preserve local device settings.
-      // ----------------------------------------------------------
+        await db.recurringRules.bulkPut(
+          data.recurringRules as never[]
+        );
 
-      const restoredAppSettings = data.settings.find(
-        setting => setting.id === 'app'
-      );
-      
+        await db.reviewQueue.bulkPut(
+          data.reviewQueue as never[]
+        );
+
+        await db.budgets.bulkPut(
+          data.budgets as never[]
+        );
+
+        await db.investments.bulkPut(
+          data.investments as never[]
+        );
+
+        await db.interestDeposits.bulkPut(
+          data.interestDeposits as never[]
+        );
+      } else {
+        const transactions =
+          await db.transactions.toArray();
+
+        const accounts =
+          await db.accounts.toArray();
+
+        const categories =
+          await db.categories.toArray();
+
+        const recurringRules =
+          await db.recurringRules.toArray();
+
+        const reviewQueue =
+          await db.reviewQueue.toArray();
+
+        const budgets =
+          await db.budgets.toArray();
+
+        const investments =
+          await db.investments.toArray();
+
+        const interestDeposits =
+          await db.interestDeposits.toArray();
+
+        await db.transactions.bulkPut(
+          mergeRecords(
+            transactions,
+            data.transactions as Transaction[]
+          ) as never[]
+        );
+
+        await db.accounts.bulkPut(
+          mergeRecords(
+            accounts,
+            data.accounts as Account[]
+          ) as never[]
+        );
+
+        await db.categories.bulkPut(
+          mergeRecords(
+            categories,
+            data.categories as Category[]
+          ) as never[]
+        );
+
+        await db.recurringRules.bulkPut(
+          mergeRecords(
+            recurringRules,
+            data.recurringRules as RecurringRule[]
+          ) as never[]
+        );
+
+        await db.reviewQueue.bulkPut(
+          mergeRecords(
+            reviewQueue,
+            data.reviewQueue as ReviewQueueItem[]
+          ) as never[]
+        );
+
+        await db.budgets.bulkPut(
+          mergeRecords(
+            budgets,
+            data.budgets as Budget[]
+          ) as never[]
+        );
+
+        await db.investments.bulkPut(
+          mergeRecords(
+            investments,
+            data.investments as InvestmentEntry[]
+          ) as never[]
+        );
+
+        await db.interestDeposits.bulkPut(
+          mergeRecords(
+            interestDeposits,
+            data.interestDeposits as InterestDeposit[]
+          ) as never[]
+        );
+      }
+
+      const restoredAppSettings =
+        data.settings.find(
+          setting => setting.id === 'app'
+        );
+
       if (restoredAppSettings) {
-        const restoredSettings: AppSettings = {
-          ...restoredAppSettings,
-          ...preservedDeviceSettings,
-          id: 'app',
-        };
-      
-        await db.settings.put(restoredSettings);
+        if (mode === 'replace') {
+          const restoredSettings: AppSettings = {
+            ...restoredAppSettings,
+            ...preservedDeviceSettings,
+            id: 'app',
+          };
+
+          await db.settings.put(
+            restoredSettings
+          );
+        } else {
+          /*
+           * Merge mode deliberately keeps the
+           * destination's current settings.
+           *
+           * This prevents an old backup from
+           * reverting newer user preferences.
+           *
+           * Device-local security is preserved
+           * regardless of restore mode.
+           */
+          if (!currentSettings) {
+            const restoredSettings: AppSettings = {
+              ...restoredAppSettings,
+              ...preservedDeviceSettings,
+              id: 'app',
+            };
+
+            await db.settings.put(
+              restoredSettings
+            );
+          }
+        }
       }
     }
   );
@@ -707,4 +923,38 @@ export function calculateNextAutoBackupAt(
   }
 
   return candidate;
+}
+export async function savePendingRestore(
+  file: File,
+  targetPartition: DataPartition,
+  mode: RestoreMode
+): Promise<void> {
+  const content = await file.text();
+
+  const pending: PendingRestore = {
+    id: 'restore',
+    filename: file.name,
+    content,
+    targetPartition,
+    mode,
+    createdAt: new Date().toISOString(),
+  };
+
+  await restoreTransferDb.pendingRestores.put(
+    pending
+  );
+}
+
+export async function getPendingRestore(): Promise<PendingRestore | null> {
+  return (
+    (await restoreTransferDb.pendingRestores.get(
+      'restore'
+    )) ?? null
+  );
+}
+
+export async function clearPendingRestore(): Promise<void> {
+  await restoreTransferDb.pendingRestores.delete(
+    'restore'
+  );
 }

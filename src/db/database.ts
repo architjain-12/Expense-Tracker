@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Account, AppSettings, Budget, Category, InvestmentEntry, RecurringRule, ReviewQueueItem, SyncQueueItem, Transaction, InterestDeposit, PendingBackup } from '../types/models';
+import type { Account, AppSettings, Budget, Category, InvestmentEntry, RecurringRule, ReviewQueueItem, SyncQueueItem, Transaction, InterestDeposit, PendingBackup, PendingRestore } from '../types/models';
 
 /**
  * Each browser/device gets its own IndexedDB storage. v2.3 adds logical
@@ -18,6 +18,20 @@ export function switchPartition(partition: DataPartition): void {
   localStorage.setItem(PARTITION_KEY, partition);
   window.location.reload();
 }
+
+class RestoreTransferDB extends Dexie {
+  pendingRestores!: Table<PendingRestore, string>;
+
+  constructor() {
+    super('ExpenseTrackerRestoreTransferDB');
+
+    this.version(1).stores({
+      pendingRestores: 'id',
+    });
+  }
+}
+
+export const restoreTransferDb = new RestoreTransferDB();
 
 export class ExpenseDB extends Dexie {
   transactions!: Table<Transaction, string>;

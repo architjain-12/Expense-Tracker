@@ -194,3 +194,12 @@ export interface PendingBackup {
   content: string;
   createdAt: string;
 }
+
+export interface PendingRestore {
+  id: 'restore';
+  filename: string;
+  content: string;
+  targetPartition: 'personal' | 'demo';
+  mode: 'merge' | 'replace';
+  createdAt: string;
+}

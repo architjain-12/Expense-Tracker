@@ -2685,3 +2685,56 @@ select option {
 .spending-donut path:focus {
   outline: none !important;
 }
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.65);
+}
+
+.modal-panel {
+  width: min(520px, 100%);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+  padding: 24px;
+  border-radius: 18px;
+  background: var(--panel, #15181d);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+}
+
+.restore-details {
+  display: grid;
+  gap: 10px;
+  margin: 18px 0;
+  line-height: 1.5;
+}
+
+.restore-actions {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.restore-option-btn {
+  width: 100%;
+  min-height: 52px;
+  text-align: left;
+}
+
+.restore-option-btn strong,
+.restore-option-btn .form-help {
+  display: block;
+}
+
+.restore-option-btn .form-help {
+  margin-top: 4px;
+}
+
+.modal-panel h3 {
+  margin-top: 22px;
+}

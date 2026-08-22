@@ -22,9 +22,14 @@ import { ensureSeedData } from "../db/seed";
 import { processDueRecurringTransactions } from "../services/recurringService";
 import { restoreFromGoogleSheetsIfEmpty } from "../services/googleSheetsService";
 import { useSettings } from "../hooks/useDb";
-import {checkAndCreateAutoBackup} from "../services/backupService";
+import {
+  getPendingRestore,
+  clearPendingRestore,
+  restoreEncryptedArchive,
+  checkAndCreateAutoBackup
+} from '../services/backupService';
 import packageJson from "../../package.json";
-import { db, getActivePartition } from "../db/database";
+import { db, getActivePartition, restoreTransferDb } from "../db/database";
 
 function ThemeSync() {
   const settings = useSettings();
@@ -38,37 +43,109 @@ function Bootstrap() {
     useEffect(() => {
       const run = async () => {
         try {
-          console.log("BOOTSTRAP: ensureSeedData START");
-          await ensureSeedData();
-          console.log("BOOTSTRAP: ensureSeedData OK");
-  
-          console.log("BOOTSTRAP: processDueRecurringTransactions START");
-          await processDueRecurringTransactions();
-          console.log("BOOTSTRAP: processDueRecurringTransactions OK");
-  
-          console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty START");
-          await restoreFromGoogleSheetsIfEmpty();
-          console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty OK");
-          await checkAndCreateAutoBackup(
-            packageJson.version,
-            getActivePartition()
+          console.log(
+            "BOOTSTRAP: ensureSeedData START"
           );
-          await db.settings.update('app', {
-            lastAutoBackupSavedAt:
-              new Date().toISOString(),
-          });
-          console.log("BOOTSTRAP: COMPLETE");
+
+          await ensureSeedData();
+
+          console.log(
+            "BOOTSTRAP: ensureSeedData OK"
+          );
+
+          /*
+          * ------------------------------------------------------
+          * Complete a cross-partition restore that was staged
+          * before the partition switch/reload.
+          * ------------------------------------------------------
+          */
+
+          const pendingRestore =
+            await getPendingRestore();
+
+          if (pendingRestore) {
+            const activePartition =
+              getActivePartition();
+
+            if (
+              pendingRestore.targetPartition ===
+              activePartition
+            ) {
+              console.log(
+                "BOOTSTRAP: pending restore found"
+              );
+
+              const file = new File(
+                [pendingRestore.content],
+                pendingRestore.filename,
+                {
+                  type: "text/plain",
+                }
+              );
+
+              await restoreEncryptedArchive(
+                file,
+                "1234567890",
+                pendingRestore.mode
+              );
+
+              await clearPendingRestore();
+
+              console.log(
+                "BOOTSTRAP: pending restore completed"
+              );
+            }
+          }
+
+          console.log(
+            "BOOTSTRAP: processDueRecurringTransactions START"
+          );
+
+          await processDueRecurringTransactions();
+
+          console.log(
+            "BOOTSTRAP: processDueRecurringTransactions OK"
+          );
+
+          console.log(
+            "BOOTSTRAP: restoreFromGoogleSheetsIfEmpty START"
+          );
+
+          await restoreFromGoogleSheetsIfEmpty();
+
+          console.log(
+            "BOOTSTRAP: restoreFromGoogleSheetsIfEmpty OK"
+          );
+
+          console.log(
+            "BOOTSTRAP: COMPLETE"
+          );
         } catch (error) {
-          console.error("BOOTSTRAP FAILED:", error);
-          console.error("ERROR NAME:", (error as any)?.name);
-          console.error("ERROR MESSAGE:", (error as any)?.message);
-          console.error("BULK ERRORS:", (error as any)?.errors);
+          console.error(
+            "BOOTSTRAP FAILED:",
+            error
+          );
+
+          console.error(
+            "ERROR NAME:",
+            (error as any)?.name
+          );
+
+          console.error(
+            "ERROR MESSAGE:",
+            (error as any)?.message
+          );
+
+          console.error(
+            "BULK ERRORS:",
+            (error as any)?.errors
+          );
         }
       };
-  
+
       void run();
     }, []);
-  
+
     return null;
   }
 
