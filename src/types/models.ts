@@ -148,6 +148,10 @@ export interface AppSettings {
   lockMethod?: 'PASSKEY' | 'PIN';
   passkeyCredentialId?: string;
   localPinHash?: string;
+  autoBackupEnabled?: boolean;
+  autoBackupIntervalHours?: number;
+  lastAutoBackupGeneratedAt?: string
+  lastAutoBackupSavedAt?: string;
 }
 
 export interface SyncQueueItem {
@@ -180,4 +184,11 @@ export interface InterestDeposit {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PendingBackup {
+  id: 'auto';
+  filename: string;
+  content: string;
+  createdAt: string;
 }

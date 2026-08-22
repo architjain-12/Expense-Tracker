@@ -468,14 +468,19 @@ export async function restoreSnapshot(data: Snapshot): Promise<void> {
       // Restore portable settings + preserve local device settings.
       // ----------------------------------------------------------
 
-      const restoredSettings = data.settings.map(setting => ({
-        ...setting,
-        ...preservedDeviceSettings,
-      }));
-
-      await db.settings.bulkPut(
-        restoredSettings as never[]
+      const restoredAppSettings = data.settings.find(
+        setting => setting.id === 'app'
       );
+      
+      if (restoredAppSettings) {
+        const restoredSettings: AppSettings = {
+          ...restoredAppSettings,
+          ...preservedDeviceSettings,
+          id: 'app',
+        };
+      
+        await db.settings.put(restoredSettings);
+      }
     }
   );
 }
@@ -495,4 +500,35 @@ export async function restoreLegacyJsonBackup(file: File): Promise<number> {
 
 export async function createSafetyArchive(password: string, applicationVersion: string, partition: string): Promise<ArchiveManifest> {
   return createEncryptedArchive(password, applicationVersion, partition, 'expense-tracker-pre-restore-safety');
+}
+
+export async function savePendingAutoBackup(
+  file: File
+): Promise<void> {
+  const content = await file.text();
+
+  await db.pendingBackups.put({
+    id: 'auto',
+    filename: file.name,
+    content,
+    createdAt: new Date().toISOString(),
+  });
+}
+
+export async function getPendingAutoBackup(): Promise<File | null> {
+  const pending = await db.pendingBackups.get('auto');
+
+  if (!pending) {
+    return null;
+  }
+
+  return new File(
+    [pending.content],
+    pending.filename,
+    { type: 'text/plain' }
+  );
+}
+
+export async function clearPendingAutoBackup(): Promise<void> {
+  await db.pendingBackups.delete('auto');
 }

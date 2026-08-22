@@ -30,6 +30,7 @@ export class ExpenseDB extends Dexie {
   interestDeposits!: Table<InterestDeposit, string>;
   syncQueue!: Table<SyncQueueItem, string>;
   settings!: Table<AppSettings, string>;
+  pendingBackups!: Table<PendingBackup, string>;
 
   constructor(name = `ExpenseTrackerDB-${getActivePartition()}`) {
     super(name);
@@ -59,6 +60,15 @@ export class ExpenseDB extends Dexie {
       recurringRules: 'id, nextDueDate, active, updatedAt', reviewQueue: 'id, externalId, status, transactionDateTime, merchant',
       budgets: 'id, categoryId, period, startDate', investments: 'id, date, assetType, type, accountId, updatedAt, syncStatus',
       interestDeposits: 'id, type, maturityDate, active, updatedAt', syncQueue: 'id, entityType, entityId, status, createdAt', settings: 'id',
+    });
+
+    this.version(5).stores({
+      transactions: 'id, transactionDateTime, accountId, categoryId, subcategoryId, merchant, updatedAt, syncStatus, source, recurringRuleId, sourceId',
+      accounts: 'id, name, isDefault, active, updatedAt', categories: 'id, name, parentId, active, sortOrder',
+      recurringRules: 'id, nextDueDate, active, updatedAt', reviewQueue: 'id, externalId, status, transactionDateTime, merchant',
+      budgets: 'id, categoryId, period, startDate', investments: 'id, date, assetType, type, accountId, updatedAt, syncStatus',
+      interestDeposits: 'id, type, maturityDate, active, updatedAt', syncQueue: 'id, entityType, entityId, status, createdAt', settings: 'id',
+      pendingBackups: 'id',
     });
   }
 }

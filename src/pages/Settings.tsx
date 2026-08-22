@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { DatabaseBackup, FileUp, RefreshCcw, ShieldCheck, Smartphone, Unlock, Trash2, Plus, RotateCcw } from 'lucide-react';
 import { db, getActivePartition, switchPartition } from '../db/database';
@@ -14,9 +14,42 @@ import packageJson from "../../package.json";
 export default function Settings(){
  const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [backupMessage,setBackupMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
  const [pendingBackup,setPendingBackup]=useState<File|null>(null);
+ const [autoBackupDue, setAutoBackupDue] = useState(false);
  const buildNumber = import.meta.env.VITE_BUILD_NUMBER || 'LOCAL';
  const appVersionNumber = packageJson.version || 'X.X.X';
  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'dev';
+ const AUTO_BACKUP_OPTIONS = [
+  { label: 'Every 6 hours', hours: 6 },
+  { label: 'Every 24 hours', hours: 24 },
+  { label: 'Every 3 days', hours: 72 },
+  { label: 'Every 7 days', hours: 168 },
+  { label: 'Every 30 days', hours: 720 },
+];
+useEffect(() => {
+  if (!settings?.autoBackupEnabled) return;
+
+  const run = async () => {
+    const intervalHours = settings.autoBackupIntervalHours || 168;
+
+    const lastBackup = settings.lastAutoBackupAt
+      ? new Date(settings.lastAutoBackupAt).getTime()
+      : 0;
+
+    const due =
+      !lastBackup ||
+      Date.now() - lastBackup >= intervalHours * 60 * 60 * 1000;
+
+    if (due && !pendingBackup) {
+      await createAutoBackup();
+    }
+  };
+
+  void run();
+}, [
+  settings?.autoBackupEnabled,
+  settings?.autoBackupIntervalHours,
+  settings?.lastAutoBackupAt,
+]);
  async function save(patch:Partial<NonNullable<typeof settings>>){const current=await db.settings.get('app');if(current)await db.settings.put({...current,...patch});}
  async function saveSheets(){await save({googleSheetsEndpoint:sheetUrl||settings?.googleSheetsEndpoint,googleSheetsToken:sheetToken||settings?.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||settings?.googleSheetsEndpoint)});setMessage('Google Sheets connection saved locally.');}
  async function sync(){const result=await syncWithGoogleSheets();setMessage(result.success?`Synced ${result.processed||0} changes.`:(result.message||'Sync failed.'));}
@@ -50,13 +83,32 @@ export default function Settings(){
    setBackupMessage('Backup is ready. Tap “Save backup to Files” to open the iPhone share sheet.');
   } catch(e){setBackupMessage(e instanceof Error?e.message:'Backup export failed.');}
  }
- async function savePendingBackup(){
-  if(!pendingBackup)return;
-  try{
-   const mode=await shareArchiveFile(pendingBackup);
-   setPendingBackup(null);
-   setBackupMessage(mode==='shared'?'Backup shared. Choose Save to Files, iCloud Drive, or another destination.':'Backup sent to Downloads.');
-  }catch(e){setBackupMessage(e instanceof Error?e.message:'Could not save backup.');}
+ async function savePendingBackup() {
+  if (!pendingBackup) return;
+
+  try {
+    const mode = await shareArchiveFile(pendingBackup);
+
+    await save({
+      lastAutoBackupAt: new Date().toISOString(),
+    });
+
+    setPendingBackup(null);
+    setAutoBackupDue(false);
+
+    setBackupMessage(
+      mode === 'shared'
+        ? 'Backup saved. Choose “Save to Files”, iCloud Drive, or another destination.'
+        : 'Backup downloaded successfully.'
+    );
+
+  } catch (e) {
+    setBackupMessage(
+      e instanceof Error
+        ? e.message
+        : 'Could not save backup.'
+    );
+  }
  }
  async function importBackup(file?: File) {
   console.log({
@@ -142,6 +194,50 @@ export default function Settings(){
     setBackupMessage(`RESTORE ERROR: ${errorMessage}`);
   }
 }
+async function checkAutoBackup() {
+  if (!settings?.autoBackupEnabled) {
+    setAutoBackupDue(false);
+    return;
+  }
+
+  const intervalHours = settings.autoBackupIntervalHours || 168;
+
+  const lastBackup = settings.lastAutoBackupAt
+    ? new Date(settings.lastAutoBackupAt).getTime()
+    : 0;
+
+  const now = Date.now();
+
+  const due =
+    !lastBackup ||
+    now - lastBackup >= intervalHours * 60 * 60 * 1000;
+
+  setAutoBackupDue(due);
+}
+
+async function createAutoBackup() {
+  try {
+    const manifest = await createEncryptedArchive(
+      '1234567890',
+      appVersionNumber,
+      getActivePartition(),
+      'expense-tracker-auto-backup'
+    );
+
+    setPendingBackup(manifest.archiveFile);
+    setBackupMessage(
+      'Your scheduled backup is ready. Tap “Save backup” to store it in Files.'
+    );
+
+  } catch (e) {
+    setBackupMessage(
+      e instanceof Error
+        ? `Automatic backup failed: ${e.message}`
+        : 'Automatic backup failed.'
+    );
+  }
+}
+
  async function addAccount(){if(!accountName.trim())return;const now=new Date().toISOString();const a:Account={id:newId('account'),name:accountName.trim(),type:accountType,isDefault:accounts.length===0,active:true,statementDay:accountType==='CREDIT_CARD'?Number(statementDay)||undefined:undefined,paymentDueDay:accountType==='CREDIT_CARD'?Number(paymentDueDay)||undefined:undefined,createdAt:now,updatedAt:now};await db.accounts.put(a);if(a.isDefault)await save({defaultAccountId:a.id});setAccountName('');setMessage('Account added.')}
  async function editAccount(a:Account){const name=prompt('Account name',a.name);if(!name?.trim())return;const updated={...a,name:name.trim(),updatedAt:new Date().toISOString()};await db.accounts.put(updated);setMessage('Account updated.')}
  async function setPrimary(a:Account){await db.accounts.toCollection().modify(x=>{x.isDefault=x.id===a.id;x.updatedAt=new Date().toISOString()});await save({defaultAccountId:a.id});setMessage(`${a.name} is now the default account.`)}
@@ -155,6 +251,110 @@ export default function Settings(){
  <section className="panel"><div className="panel-header"><div><h2>Accounts</h2><p>Create or modify accounts used by transactions.</p></div></div><div className="settings-grid"><label>Account name<input value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="ICICI Savings"/></label><label>Type<select value={accountType} onChange={e=>setAccountType(e.target.value as AccountType)}><option value="BANK_ACCOUNT">Bank account</option><option value="CREDIT_CARD">Credit card</option><option value="CASH">Cash</option><option value="WALLET">Wallet</option><option value="INVESTMENT">Investment</option><option value="OTHER">Other</option></select></label>{accountType==='CREDIT_CARD'&&<><label>Statement/billed day<input type="number" min="1" max="31" value={statementDay} onChange={e=>setStatementDay(e.target.value)} placeholder="25"/></label><label>Payment due day<input type="number" min="1" max="31" value={paymentDueDay} onChange={e=>setPaymentDueDay(e.target.value)} placeholder="10"/></label></>}</div><div className="inline-actions"><button className="primary-btn" onClick={addAccount}><Plus size={16}/> Add account</button></div><div className="stacked-list">{accounts.map(a=><div className="stat-row" key={a.id}><span>{a.name} · {a.type.replaceAll('_',' ')}{a.type==='CREDIT_CARD'&&a.statementDay?` · statement ${a.statementDay} · due ${a.paymentDueDay||'—'}`:''}</span><span className="inline-actions"><button className="icon-btn small" onClick={()=>editAccount(a)}>Edit</button>{!a.isDefault&&<button className="icon-btn small" onClick={()=>setPrimary(a)}>Primary</button>}</span></div>)}</div></section>
  <section className="panel"><div className="panel-header"><div><h2>Transaction defaults</h2><p>Keep Add Transaction fast.</p></div></div><div className="settings-grid"><label>Default account<select value={settings?.defaultAccountId||''} onChange={e=>save({defaultAccountId:e.target.value||undefined})}><option value="">No default</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>Needs / Wants<select value={settings?.defaultNeedWant||''} onChange={e=>save({defaultNeedWant:e.target.value as any||undefined})}><option value="">No default</option><option value="NEED">Needs</option><option value="WANT">Wants</option></select></label><label>Essential / Discretionary<select value={settings?.defaultEssentialDiscretionary||''} onChange={e=>save({defaultEssentialDiscretionary:e.target.value as any||undefined})}><option value="">No default</option><option value="ESSENTIAL">Essential</option><option value="DISCRETIONARY">Discretionary</option></select></label><label>Fixed / Variable<select value={settings?.defaultFixedVariable||''} onChange={e=>save({defaultFixedVariable:e.target.value as any||undefined})}><option value="">No default</option><option value="FIXED">Fixed</option><option value="VARIABLE">Variable</option></select></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Google Sheets</h2><p>Cloud copy and recovery. Credentials are runtime-only settings.</p></div><ShieldCheck size={18}/></div><div className="warning-note">When local data is empty and a valid connection already exists, the app can attempt a smart restore. No credentials are embedded in the public repository.</div><label>Apps Script endpoint<input value={sheetUrl||settings?.googleSheetsEndpoint||''} onChange={e=>setSheetUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec"/></label><label>Sync token<input type="password" value={sheetToken||settings?.googleSheetsToken||''} onChange={e=>setSheetToken(e.target.value)} placeholder="Personal sync key"/></label><div className="inline-actions"><button className="secondary-btn" onClick={saveSheets}>Save connection</button><button className="primary-btn" onClick={sync}><RefreshCcw size={16}/> Sync now</button><button className="secondary-btn" onClick={restore}><DatabaseBackup size={16}/> Restore</button></div></section>
+ <section className="panel">
+  <div className="panel-header">
+    <div>
+      <h2>Automatic backup</h2>
+      <p>
+        Create an encrypted backup when you return to the app after the
+        selected interval.
+      </p>
+    </div>
+
+    <DatabaseBackup size={18} />
+  </div>
+
+  <div className="settings-grid">
+
+    <label>
+      Automatic backup
+      <select
+        value={settings?.autoBackupEnabled ? 'ON' : 'OFF'}
+        onChange={async e => {
+          const enabled = e.target.value === 'ON';
+
+          await save({
+            autoBackupEnabled: enabled,
+            ...(enabled && !settings?.lastAutoBackupAt
+              ? { lastAutoBackupAt: undefined }
+              : {}),
+          });
+
+          setAutoBackupDue(enabled);
+        }}
+      >
+        <option value="OFF">Off</option>
+        <option value="ON">On</option>
+      </select>
+    </label>
+
+    {settings?.autoBackupEnabled && (
+      <label>
+        Backup frequency
+        <select
+          value={settings.autoBackupIntervalHours || 168}
+          onChange={async e => {
+            await save({
+              autoBackupIntervalHours: Number(e.target.value),
+            });
+
+            setAutoBackupDue(true);
+          }}
+        >
+          {AUTO_BACKUP_OPTIONS.map(option => (
+            <option
+              key={option.hours}
+              value={option.hours}
+            >
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    )}
+
+  </div>
+
+  {settings?.autoBackupEnabled && (
+    <div className="warning-note">
+      Backups are created automatically when the app is opened after
+      the selected interval. iPhone requires you to confirm the final
+      “Save to Files” action.
+    </div>
+  )}
+
+  {settings?.lastAutoBackupAt && (
+    <p className="form-help">
+      Last backup:
+      {' '}
+      {new Date(settings.lastAutoBackupAt).toLocaleString()}
+    </p>
+  )}
+
+  {autoBackupDue && !pendingBackup && (
+    <div className="inline-actions">
+      <button
+        className="primary-btn"
+        onClick={() => void createAutoBackup()}
+      >
+        <DatabaseBackup size={16} />
+        Create backup now
+      </button>
+    </div>
+  )}
+
+  {pendingBackup && (
+    <div className="inline-actions">
+      <button
+        className="primary-btn"
+        onClick={() => void savePendingBackup()}
+      >
+        <DatabaseBackup size={16} />
+        Save backup to Files
+      </button>
+    </div>
+  )}
+</section>
  <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Encrypted, integrity-checked local archive for device loss, corruption and migration. A safety archive is created before every restore.</p></div></div>{backupMessage&&<div className="success-banner">{backupMessage}</div>}<div className="inline-actions"><button className="primary-btn" onClick={exportBackup}><DatabaseBackup size={16}/> Encrypted backup</button>{pendingBackup&&<button className="primary-btn" onClick={savePendingBackup}><DatabaseBackup size={16}/> Save backup to Files</button>}<button className="secondary-btn" onClick={exportCsv}>CSV</button><button className="secondary-btn" onClick={exportExcel}>Excel</button><label className="secondary-btn file-btn"><FileUp size={16}/> Restore .etarchive<input ref={fileRef} type="file" accept="*/*" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Data partition</h2><p>Personal and Demo are isolated IndexedDB namespaces.</p></div></div><div className="settings-grid"><label>Active partition<input value={getActivePartition()==='demo'?'Demo':'Personal'} readOnly/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>switchPartition('demo')}>Show Demo Data</button><button className="secondary-btn" onClick={()=>switchPartition('personal')}>My Data</button>{getActivePartition()==='demo'?<button className="secondary-btn" onClick={restoreDemo}><RotateCcw size={15}/> Restore Demo Data</button>:<button className="danger-btn" onClick={deleteAll}><Trash2 size={15}/> Master Delete This Partition</button>}</div><p className="form-help">Demo mode is for showcasing the app. A PIN can be added through Device Lock, but the partition is not a substitute for encryption.</p></section>
  <section className="panel"><div className="panel-header"><div><h2>Device Lock</h2><p>Protect against accidental entry on a shared device.</p></div><Smartphone size={18}/></div>{settings?.lockEnabled?<div className="inline-actions"><span className="sync-state"><span className="status-dot online"/> Lock enabled ({settings.lockMethod})</span><button className="secondary-btn" onClick={unlock}><Unlock size={16}/> Disable</button></div>:<><div className="settings-grid"><label>PIN<input inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>setPin(e.target.value)} placeholder="4–8 digits"/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={lockPin} disabled={!pin}>Enable PIN</button>{webAuthnAvailable()&&<button className="primary-btn" onClick={lockPasskey}><ShieldCheck size={16}/> Enable Face ID / passkey</button>}</div></>}</section>
