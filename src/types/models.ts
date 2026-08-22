@@ -151,6 +151,7 @@ export interface AppSettings {
   autoBackupEnabled?: boolean;
   autoBackupIntervalHours?: number;
   lastAutoBackupGeneratedAt?: string
+  autoBackupStartTime?: string; // HH:mm
   lastAutoBackupSavedAt?: string;
 }
 

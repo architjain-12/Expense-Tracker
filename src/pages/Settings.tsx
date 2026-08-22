@@ -5,7 +5,7 @@ import { db, getActivePartition, switchPartition } from '../db/database';
 import { restoreFromGoogleSheets, syncWithGoogleSheets } from '../services/googleSheetsService';
 import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
-import type { Account, AccountType } from '../types/models';
+import type { Account, AccountType, PendingBackup } from '../types/models';
 import { newId } from '../utils/id';
 import { createEncryptedArchive, createSafetyArchive, restoreEncryptedArchive, restoreLegacyJsonBackup, shareArchiveFile } from '../services/backupService';
 import { resetDemoData } from '../db/seed';
@@ -13,12 +13,19 @@ import packageJson from "../../package.json";
 
 export default function Settings(){
  const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [backupMessage,setBackupMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
- const [pendingBackup,setPendingBackup]=useState<File|null>(null);
+ const [pendingBackup,setPendingBackup]=useState<PendingBackup|null>(null);
+ const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
  const [autoBackupDue, setAutoBackupDue] = useState(false);
+ const [autoBackupIntervalHours, setAutoBackupIntervalHours] =
+  useState(168);
+ const [autoBackupStartTime, setAutoBackupStartTime] = useState(
+  settings?.autoBackupStartTime || '02:00'
+  );
  const buildNumber = import.meta.env.VITE_BUILD_NUMBER || 'LOCAL';
  const appVersionNumber = packageJson.version || 'X.X.X';
  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'dev';
  const AUTO_BACKUP_OPTIONS = [
+  { label: 'Every 2 hours', hours: 2 },
   { label: 'Every 6 hours', hours: 6 },
   { label: 'Every 24 hours', hours: 24 },
   { label: 'Every 3 days', hours: 72 },
@@ -26,13 +33,38 @@ export default function Settings(){
   { label: 'Every 30 days', hours: 720 },
 ];
 useEffect(() => {
+  if (!settings) return;
+
+  setAutoBackupEnabled(settings.autoBackupEnabled ?? false);
+
+  setAutoBackupIntervalHours(
+    settings.autoBackupIntervalHours || 168
+  );
+
+  setAutoBackupStartTime(
+    settings.autoBackupStartTime || '02:00'
+  );
+}, [
+  settings?.autoBackupEnabled,
+  settings?.autoBackupIntervalHours,
+  settings?.autoBackupStartTime,
+]);
+useEffect(() => {
+  if (settings?.autoBackupStartTime) {
+    setAutoBackupStartTime(settings.autoBackupStartTime);
+  }
+}, [settings?.autoBackupStartTime]);
+useEffect(() => {
+  void loadPendingBackup();
+}, []);
+useEffect(() => {
   if (!settings?.autoBackupEnabled) return;
 
   const run = async () => {
     const intervalHours = settings.autoBackupIntervalHours || 168;
 
-    const lastBackup = settings.lastAutoBackupAt
-      ? new Date(settings.lastAutoBackupAt).getTime()
+    const lastBackup = settings.lastAutoBackupSavedAt
+      ? new Date(settings.lastAutoBackupSavedAt).getTime()
       : 0;
 
     const due =
@@ -48,7 +80,7 @@ useEffect(() => {
 }, [
   settings?.autoBackupEnabled,
   settings?.autoBackupIntervalHours,
-  settings?.lastAutoBackupAt,
+  settings?.lastAutoBackupSavedAt,
 ]);
  async function save(patch:Partial<NonNullable<typeof settings>>){const current=await db.settings.get('app');if(current)await db.settings.put({...current,...patch});}
  async function saveSheets(){await save({googleSheetsEndpoint:sheetUrl||settings?.googleSheetsEndpoint,googleSheetsToken:sheetToken||settings?.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||settings?.googleSheetsEndpoint)});setMessage('Google Sheets connection saved locally.');}
@@ -79,7 +111,19 @@ useEffect(() => {
   // if(!password)return;
   try {
    const manifest=await createEncryptedArchive('1234567890', appVersionNumber, getActivePartition());
-   setPendingBackup(manifest.archiveFile);
+   const content = await manifest.archiveFile.text();
+
+  const pending: PendingBackup = {
+    id: 'auto',
+    filename: manifest.archiveFile.name,
+    content,
+    createdAt: new Date().toISOString(),
+  };
+
+  await db.pendingBackups.put(pending);
+
+  setPendingBackup(pending);
+
    setBackupMessage('Backup is ready. Tap “Save backup to Files” to open the iPhone share sheet.');
   } catch(e){setBackupMessage(e instanceof Error?e.message:'Backup export failed.');}
  }
@@ -87,21 +131,34 @@ useEffect(() => {
   if (!pendingBackup) return;
 
   try {
-    const mode = await shareArchiveFile(pendingBackup);
-
-    await save({
-      lastAutoBackupAt: new Date().toISOString(),
-    });
-
-    setPendingBackup(null);
-    setAutoBackupDue(false);
-
-    setBackupMessage(
-      mode === 'shared'
-        ? 'Backup saved. Choose “Save to Files”, iCloud Drive, or another destination.'
-        : 'Backup downloaded successfully.'
+    const file = new File(
+      [pendingBackup.content],
+      pendingBackup.filename,
+      {
+        type: 'text/plain',
+      }
     );
 
+    const mode = await shareArchiveFile(file);
+
+    if (mode === 'shared') {
+      await db.pendingBackups.delete('auto');
+
+      await save({
+        lastAutoBackupSavedAt: new Date().toISOString(),
+      });
+
+      setPendingBackup(null);
+      setAutoBackupDue(false);
+
+      setBackupMessage(
+        'Backup saved. Choose “Save to Files”, iCloud Drive, or another destination.'
+      );
+    } else {
+      setBackupMessage(
+        'Backup downloaded successfully.'
+      );
+    }
   } catch (e) {
     setBackupMessage(
       e instanceof Error
@@ -109,7 +166,7 @@ useEffect(() => {
         : 'Could not save backup.'
     );
   }
- }
+}
  async function importBackup(file?: File) {
   console.log({
     secureContext: window.isSecureContext,
@@ -194,6 +251,20 @@ useEffect(() => {
     setBackupMessage(`RESTORE ERROR: ${errorMessage}`);
   }
 }
+async function loadPendingBackup() {
+  try {
+    const pending = await db.pendingBackups.get('auto');
+
+    if (pending) {
+      setPendingBackup(pending);
+      setBackupMessage(
+        'A backup is waiting to be saved. Tap “Save backup to Files”.'
+      );
+    }
+  } catch (e) {
+    console.error('Could not load pending backup:', e);
+  }
+}
 async function checkAutoBackup() {
   if (!settings?.autoBackupEnabled) {
     setAutoBackupDue(false);
@@ -201,16 +272,29 @@ async function checkAutoBackup() {
   }
 
   const intervalHours = settings.autoBackupIntervalHours || 168;
+  const startTime = settings.autoBackupStartTime || '02:00';
 
-  const lastBackup = settings.lastAutoBackupAt
-    ? new Date(settings.lastAutoBackupAt).getTime()
-    : 0;
+  const [hours, minutes] = startTime.split(':').map(Number);
 
-  const now = Date.now();
+  const now = new Date();
+
+  // First backup: use today's configured start time.
+  const scheduledStart = new Date(now);
+  scheduledStart.setHours(hours, minutes, 0, 0);
+
+  // If today's start time has not happened yet,
+  // the first backup is not due yet.
+  if (!settings.lastAutoBackupSavedAt) {
+    setAutoBackupDue(now >= scheduledStart);
+    return;
+  }
+
+  const lastBackup = new Date(
+    settings.lastAutoBackupSavedAt
+  ).getTime();
 
   const due =
-    !lastBackup ||
-    now - lastBackup >= intervalHours * 60 * 60 * 1000;
+    Date.now() - lastBackup >= intervalHours * 60 * 60 * 1000;
 
   setAutoBackupDue(due);
 }
@@ -224,11 +308,22 @@ async function createAutoBackup() {
       'expense-tracker-auto-backup'
     );
 
-    setPendingBackup(manifest.archiveFile);
-    setBackupMessage(
-      'Your scheduled backup is ready. Tap “Save backup” to store it in Files.'
-    );
+    const content = await manifest.archiveFile.text();
 
+    const pending: PendingBackup = {
+      id: 'auto',
+      filename: manifest.archiveFile.name,
+      content,
+      createdAt: new Date().toISOString(),
+    };
+
+    await db.pendingBackups.put(pending);
+
+    setPendingBackup(pending);
+
+    setBackupMessage(
+      'Your scheduled backup is ready. Tap “Save backup to Files”.'
+    );
   } catch (e) {
     setBackupMessage(
       e instanceof Error
@@ -275,8 +370,8 @@ async function createAutoBackup() {
 
           await save({
             autoBackupEnabled: enabled,
-            ...(enabled && !settings?.lastAutoBackupAt
-              ? { lastAutoBackupAt: undefined }
+            ...(enabled && !settings?.lastAutoBackupSavedAt
+              ? { lastAutoBackupSavedAt: undefined }
               : {}),
           });
 
@@ -289,6 +384,7 @@ async function createAutoBackup() {
     </label>
 
     {settings?.autoBackupEnabled && (
+      <>
       <label>
         Backup frequency
         <select
@@ -311,23 +407,25 @@ async function createAutoBackup() {
           ))}
         </select>
       </label>
+      <label>
+      Start time
+      <input
+        type="time"
+        value={autoBackupStartTime}
+        onChange={e =>
+          setAutoBackupStartTime(e.target.value)
+        }
+      />
+      </label>
+      </>
     )}
-
   </div>
 
-  {settings?.autoBackupEnabled && (
-    <div className="warning-note">
-      Backups are created automatically when the app is opened after
-      the selected interval. iPhone requires you to confirm the final
-      “Save to Files” action.
-    </div>
-  )}
-
-  {settings?.lastAutoBackupAt && (
+  {settings?.lastAutoBackupSavedAt && (
     <p className="form-help">
       Last backup:
       {' '}
-      {new Date(settings.lastAutoBackupAt).toLocaleString()}
+      {new Date(settings.lastAutoBackupSavedAt).toLocaleString()}
     </p>
   )}
 
@@ -354,6 +452,31 @@ async function createAutoBackup() {
       </button>
     </div>
   )}
+
+<div className="inline-actions">
+  <button
+    className="primary-btn"
+    onClick={async () => {
+      await save({
+        autoBackupEnabled,
+        autoBackupIntervalHours,
+        autoBackupStartTime,
+      });
+
+      // Keep the UI state synchronized immediately.
+      setAutoBackupEnabled(autoBackupEnabled);
+      setAutoBackupIntervalHours(autoBackupIntervalHours);
+      setAutoBackupStartTime(autoBackupStartTime);
+
+      await checkAutoBackup();
+
+      setMessage('Automatic backup settings saved locally.');
+    }}
+    >
+      <DatabaseBackup size={16} />
+      Save backup settings
+    </button>
+  </div>
 </section>
  <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Encrypted, integrity-checked local archive for device loss, corruption and migration. A safety archive is created before every restore.</p></div></div>{backupMessage&&<div className="success-banner">{backupMessage}</div>}<div className="inline-actions"><button className="primary-btn" onClick={exportBackup}><DatabaseBackup size={16}/> Encrypted backup</button>{pendingBackup&&<button className="primary-btn" onClick={savePendingBackup}><DatabaseBackup size={16}/> Save backup to Files</button>}<button className="secondary-btn" onClick={exportCsv}>CSV</button><button className="secondary-btn" onClick={exportExcel}>Excel</button><label className="secondary-btn file-btn"><FileUp size={16}/> Restore .etarchive<input ref={fileRef} type="file" accept="*/*" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Data partition</h2><p>Personal and Demo are isolated IndexedDB namespaces.</p></div></div><div className="settings-grid"><label>Active partition<input value={getActivePartition()==='demo'?'Demo':'Personal'} readOnly/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>switchPartition('demo')}>Show Demo Data</button><button className="secondary-btn" onClick={()=>switchPartition('personal')}>My Data</button>{getActivePartition()==='demo'?<button className="secondary-btn" onClick={restoreDemo}><RotateCcw size={15}/> Restore Demo Data</button>:<button className="danger-btn" onClick={deleteAll}><Trash2 size={15}/> Master Delete This Partition</button>}</div><p className="form-help">Demo mode is for showcasing the app. A PIN can be added through Device Lock, but the partition is not a substitute for encryption.</p></section>

@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Account, AppSettings, Budget, Category, InvestmentEntry, RecurringRule, ReviewQueueItem, SyncQueueItem, Transaction, InterestDeposit } from '../types/models';
+import type { Account, AppSettings, Budget, Category, InvestmentEntry, RecurringRule, ReviewQueueItem, SyncQueueItem, Transaction, InterestDeposit, PendingBackup } from '../types/models';
 
 /**
  * Each browser/device gets its own IndexedDB storage. v2.3 adds logical
