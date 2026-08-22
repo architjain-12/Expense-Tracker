@@ -27,6 +27,6 @@
     "@vitejs/plugin-basic-ssl": "^2.3.0",
     "typescript": "latest",
     "vite": "latest",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "latest"
   }
 }

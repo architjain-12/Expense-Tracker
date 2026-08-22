@@ -25,8 +25,6 @@ import { useSettings } from "../hooks/useDb";
 import {checkAndCreateAutoBackup} from "../services/backupService";
 import packageJson from "../../package.json";
 import { db, getActivePartition } from "../db/database";
-import { initializeAppLifecycle } from "../services/appLifecycleService";
-import PwaUpdatePrompt from "../components/PwaUpdatePrompt";
 
 function ThemeSync() {
   const settings = useSettings();
@@ -38,7 +36,6 @@ function ThemeSync() {
 }
 function Bootstrap() {
     useEffect(() => {
-      initializeAppLifecycle();
       const run = async () => {
         try {
           console.log("BOOTSTRAP: ensureSeedData START");
@@ -80,7 +77,6 @@ export default function App() {
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Bootstrap />
       <ThemeSync />
-      <PwaUpdatePrompt />
       <ErrorBoundary>
         <AppLockGuard>
           <Routes>
