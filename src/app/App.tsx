@@ -1,56 +1,99 @@
-import { useEffect } from 'react';
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
-import Layout from '../components/Layout';
-import AppLockGuard from '../components/AppLockGuard';
-import ErrorBoundary from '../components/ErrorBoundary';
-import Home from '../pages/Home';
-import Transactions from '../pages/Transactions';
-import AddTransaction from '../pages/AddTransaction';
-import ReviewQueue from '../pages/ReviewQueue';
-import Stats from '../pages/Stats';
-import Settings from '../pages/Settings';
-import Options from '../pages/Options';
-import Recurring from '../pages/Recurring';
-import Categories from '../pages/Categories';
-import Budgets from '../pages/Budgets';
-import Investments from '../pages/Investments';
-import TransactionDetail from '../pages/TransactionDetail';
-import Interest from '../pages/Interest';
-import Income from '../pages/Income';
-import EditTransaction from '../pages/EditTransaction';
-import { ensureSeedData } from '../db/seed';
-import { processDueRecurringTransactions } from '../services/recurringService';
-import { restoreFromGoogleSheetsIfEmpty } from '../services/googleSheetsService';
-import { useSettings } from '../hooks/useDb';
+import { useEffect } from "react";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
+import Layout from "../components/Layout";
+import AppLockGuard from "../components/AppLockGuard";
+import ErrorBoundary from "../components/ErrorBoundary";
+import Home from "../pages/Home";
+import Transactions from "../pages/Transactions";
+import AddTransaction from "../pages/AddTransaction";
+import ReviewQueue from "../pages/ReviewQueue";
+import Stats from "../pages/Stats";
+import Settings from "../pages/Settings";
+import Options from "../pages/Options";
+import Recurring from "../pages/Recurring";
+import Categories from "../pages/Categories";
+import Budgets from "../pages/Budgets";
+import Investments from "../pages/Investments";
+import TransactionDetail from "../pages/TransactionDetail";
+import Interest from "../pages/Interest";
+import Income from "../pages/Income";
+import EditTransaction from "../pages/EditTransaction";
+import { ensureSeedData } from "../db/seed";
+import { processDueRecurringTransactions } from "../services/recurringService";
+import { restoreFromGoogleSheetsIfEmpty } from "../services/googleSheetsService";
+import { useSettings } from "../hooks/useDb";
 
-function ThemeSync(){const settings=useSettings();useEffect(()=>{const theme=settings?.theme||'dark';document.documentElement.dataset.theme=theme;},[settings?.theme]);return null;}
-function Bootstrap(){useEffect(()=>{const run=async()=>{await ensureSeedData();await processDueRecurringTransactions();await restoreFromGoogleSheetsIfEmpty();};void run();},[]);return null;}
+function ThemeSync() {
+  const settings = useSettings();
+  useEffect(() => {
+    const theme = settings?.theme || "dark";
+    document.documentElement.dataset.theme = theme;
+  }, [settings?.theme]);
+  return null;
+}
+function Bootstrap() {
+    useEffect(() => {
+      const run = async () => {
+        try {
+          console.log("BOOTSTRAP: ensureSeedData START");
+          await ensureSeedData();
+          console.log("BOOTSTRAP: ensureSeedData OK");
+  
+          console.log("BOOTSTRAP: processDueRecurringTransactions START");
+          await processDueRecurringTransactions();
+          console.log("BOOTSTRAP: processDueRecurringTransactions OK");
+  
+          console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty START");
+          await restoreFromGoogleSheetsIfEmpty();
+          console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty OK");
+  
+          console.log("BOOTSTRAP: COMPLETE");
+        } catch (error) {
+          console.error("BOOTSTRAP FAILED:", error);
+          console.error("ERROR NAME:", (error as any)?.name);
+          console.error("ERROR MESSAGE:", (error as any)?.message);
+          console.error("BULK ERRORS:", (error as any)?.errors);
+        }
+      };
+  
+      void run();
+    }, []);
+  
+    return null;
+  }
 
-export default function App(){return <BrowserRouter basename={import.meta.env.BASE_URL}>
-    <Bootstrap/><ThemeSync/>
-    <ErrorBoundary>
+export default function App() {
+  return (
+    <BrowserRouter basename={import.meta.env.BASE_URL}>
+      <Bootstrap />
+      <ThemeSync />
+      <ErrorBoundary>
         <AppLockGuard>
-            <Routes>
-                <Route element={<Layout/>}>
-                <Route path="/" element={<Home/>}/>
-                <Route path="/transactions" element={<Transactions/>}/>
-                <Route path="/transactions/:id" element={<TransactionDetail/>}/>
-                <Route path="/transactions/:id/edit" element={<EditTransaction/>}/>
-                <Route path="/add" element={<AddTransaction/>}/>
-                <Route path="/review" element={<ReviewQueue/>}/>
-                <Route path="/stats" element={<Stats/>}/>
-                <Route path="/reports" element={<Stats/>}/>
-                <Route path="/categories" element={<Categories/>}/>
-                <Route path="/budgets" element={<Budgets/>}/>
-                <Route path="/investments" element={<Investments/>}/>
-                <Route path="/interest" element={<Interest/>}/>
-                <Route path="/income" element={<Income/>}/>
-                <Route path="/recurring" element={<Recurring/>}/>
-                <Route path="/options" element={<Options/>}/>
-                <Route path="/settings" element={<Settings/>}/>
-                </Route>
-            </Routes>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route path="/" element={<Home />} />
+              <Route path="/transactions" element={<Transactions />} />
+              <Route path="/transactions/:id" element={<TransactionDetail />} />
+              <Route
+                path="/transactions/:id/edit"
+                element={<EditTransaction />}
+              />
+              <Route path="/add" element={<AddTransaction />} />
+              <Route path="/review" element={<ReviewQueue />} />
+              <Route path="/stats" element={<Stats />} />
+              <Route path="/reports" element={<Stats />} />
+              <Route path="/categories" element={<Categories />} />
+              <Route path="/budgets" element={<Budgets />} />
+              <Route path="/investments" element={<Investments />} />
+              <Route path="/interest" element={<Interest />} />
+              <Route path="/income" element={<Income />} />
+              <Route path="/recurring" element={<Recurring />} />
+              <Route path="/options" element={<Options />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+          </Routes>
         </AppLockGuard>
-    </ErrorBoundary>
-    </BrowserRouter>}
-
+      </ErrorBoundary>
+    </BrowserRouter>
+  );
+}

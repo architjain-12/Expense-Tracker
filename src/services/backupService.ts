@@ -28,7 +28,12 @@ export type ArchiveManifest = {
   entityCounts: Record<string, number>;
   transactionDateRange?: { from: string; to: string };
   checksum: string;
+  storageMode?: 'shared' | 'downloaded';
 };
+
+function toBufferSource(bytes: Uint8Array): BufferSource {
+  return bytes as unknown as BufferSource;
+}
 
 function bytesToBase64(bytes: Uint8Array): string {
   let binary = '';
@@ -44,18 +49,24 @@ function base64ToBytes(value: string): Uint8Array {
   return out;
 }
 
-function utf8(value: string): Uint8Array { return new TextEncoder().encode(value); }
+  function utf8(value: string): Uint8Array { return new TextEncoder().encode(value); }
 function text(bytes: ArrayBuffer): string { return new TextDecoder().decode(bytes); }
 
 async function sha256(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest('SHA-256', utf8(value));
+  const digest = await crypto.subtle.digest('SHA-256', toBufferSource(utf8(value)));
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
-  const base = await crypto.subtle.importKey('raw', utf8(password), 'PBKDF2', false, ['deriveKey']);
+  const base = await crypto.subtle.importKey(
+    'raw',
+    toBufferSource(utf8(password)),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: KDF_ITERATIONS, hash: 'SHA-256' },
+    { name: 'PBKDF2', salt: toBufferSource(salt), iterations: KDF_ITERATIONS, hash: 'SHA-256' },
     base,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -102,14 +113,76 @@ function makeTransactionCsv(rows: unknown[]): string {
   return [header.join(','), ...body].join('\n');
 }
 
-function downloadText(content: string, filename: string): void {
-  const blob = new Blob([content], { type: 'application/json;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
-  setTimeout(() => URL.revokeObjectURL(url), 0);
+export async function shareArchiveFile(file: File): Promise<'shared' | 'downloaded'> {
+  if (typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    const shareFile = new File(
+      [await file.arrayBuffer()],
+      file.name,
+      { type: 'text/plain' }
+    );
+
+    if (
+      typeof navigator.canShare !== 'function' ||
+      !navigator.canShare({ files: [shareFile] })
+    ) {
+      throw new Error(
+        'This iPhone/browser does not support sharing backup files from this PWA.'
+      );
+    }
+
+    try {
+      // IMPORTANT: this function must be called directly from the
+      // "Save backup to Files" button click.
+      //Debug
+      console.log('Web Share:', typeof navigator.share === 'function');
+      console.log('Can Share:', typeof navigator.canShare === 'function');
+      console.log('File:', {
+        name: shareFile.name,
+        type: shareFile.type,
+        size: shareFile.size,
+      });
+
+      if (typeof navigator.canShare === 'function') {
+        console.log(
+          'Can share file:',
+          navigator.canShare({ files: [shareFile] })
+        );
+      }
+      //end debug
+      await navigator.share({
+        files: [shareFile],
+      });
+
+      return 'shared';
+    } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        throw new Error('Backup sharing was cancelled. The backup was not saved.');
+      }
+
+      throw error instanceof Error
+        ? new Error(`Could not open iPhone Share Sheet: ${error.message}`)
+        : new Error('Could not open iPhone Share Sheet.');
+    }
+  }
+
+  // Desktop fallback
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+
+  a.href = url;
+  a.download = file.name;
+  a.rel = 'noopener';
+
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+  return 'downloaded';
 }
 
-export async function createEncryptedArchive(password: string, applicationVersion: string, partition: string, filenamePrefix = 'expense-tracker-backup'): Promise<ArchiveManifest> {
+export async function createEncryptedArchive(password: string, applicationVersion: string, partition: string, filenamePrefix = 'expense-tracker-backup'): Promise<ArchiveManifest & { archiveFile: File }> {
   if (!password || password.length < 8) throw new Error('Backup password must be at least 8 characters.');
   const data = await snapshot();
   const payload = makePayload(data);
@@ -117,7 +190,7 @@ export async function createEncryptedArchive(password: string, applicationVersio
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt);
-  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, utf8(payload));
+  const ciphertext = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, toBufferSource(utf8(payload)));
   const manifest: ArchiveManifest = {
     format: ETAR_FORMAT, schemaVersion: ETAR_SCHEMA_VERSION, createdAt: new Date().toISOString(), applicationVersion,
     partition, encrypted: true, kdf: 'PBKDF2-SHA-256',
@@ -129,8 +202,13 @@ export async function createEncryptedArchive(password: string, applicationVersio
     encryption: { algorithm: 'AES-256-GCM', kdf: manifest.kdf, iterations: KDF_ITERATIONS, salt: bytesToBase64(salt), iv: bytesToBase64(iv) },
     ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
   }, null, 2);
-  downloadText(archive, `${filenamePrefix}-${new Date().toISOString().slice(0,10)}.etarchive`);
-  return manifest;
+  const filename = `${filenamePrefix}-${new Date().toISOString().slice(0,10)}.etarchive`;
+  const archiveFile = new File(
+    [archive],
+    filename,
+    { type: 'text/plain' }
+  );
+  return { ...manifest, storageMode: undefined, archiveFile };
 }
 
 function validateSnapshot(data: unknown): asserts data is Snapshot {
@@ -151,7 +229,7 @@ export async function restoreEncryptedArchive(file: File, password: string): Pro
   const key = await deriveKey(password, base64ToBytes(envelope.encryption.salt));
   let plaintext: string;
   try {
-    const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64ToBytes(envelope.encryption.iv) }, key, base64ToBytes(envelope.ciphertext || ''));
+    const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toBufferSource(base64ToBytes(envelope.encryption.iv)) }, key, toBufferSource(base64ToBytes(envelope.ciphertext || '')));
     plaintext = text(clear);
   } catch { throw new Error('Could not decrypt backup. Check the recovery password or archive integrity.'); }
   const checksum = await sha256(plaintext);

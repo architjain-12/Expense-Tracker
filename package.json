@@ -21,11 +21,12 @@
     "recharts": "latest"
   },
   "devDependencies": {
-    "typescript": "latest",
-    "vite": "latest",
-    "vite-plugin-pwa": "latest",
     "@types/node": "latest",
     "@types/react": "latest",
-    "@types/react-dom": "latest"
+    "@types/react-dom": "latest",
+    "@vitejs/plugin-basic-ssl": "^2.3.0",
+    "typescript": "latest",
+    "vite": "latest",
+    "vite-plugin-pwa": "latest"
   }
 }
