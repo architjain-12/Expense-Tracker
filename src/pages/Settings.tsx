@@ -25,6 +25,7 @@ export default function Settings(){
  const appVersionNumber = packageJson.version || 'X.X.X';
  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'dev';
  const AUTO_BACKUP_OPTIONS = [
+  { label: 'Every 5 minutes · Testing', hours: 5 / 60 },
   { label: 'Every 2 hours', hours: 2 },
   { label: 'Every 6 hours', hours: 6 },
   { label: 'Every 24 hours', hours: 24 },

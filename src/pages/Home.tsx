@@ -4,6 +4,7 @@ import {
   AlertCircle,
   ChevronDown,
   ChevronRight,
+  DatabaseBackup,
   PieChart as PieIcon,
 } from 'lucide-react';
 
@@ -23,10 +24,15 @@ import {
 } from '../services/recurringService';
 
 import { formatCurrency } from '../utils/format';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 
 import TransactionList from '../components/TransactionList';
 import MetricCard from '../components/MetricCard';
+import {
+  getPendingAutoBackup,
+  shareArchiveFile,
+  markAutoBackupSaved
+} from '../services/backupService';
 
 import {
   PieChart,
@@ -62,7 +68,19 @@ export default function Home() {
   const reviewQueue = useReviewQueue() ?? [];
   const budgets = useBudgets() ?? [];
   const recurring = useRecurringRules() ?? [];
-
+  const [pendingBackup, setPendingBackup] = useState<File | null>(null);
+  useEffect(() => {
+    const checkPendingBackup = async () => {
+      try {
+        const pending = await getPendingAutoBackup();
+        setPendingBackup(pending);
+      } catch (error) {
+        console.error('Could not check pending backup:', error);
+      }
+    };
+  
+    void checkPendingBackup();
+  }, []);
   useSettings();
 
   const monthKey = getCurrentMonthKey();
@@ -709,6 +727,48 @@ export default function Home() {
 
         </Link>
 
+      )}
+      {/* =====================================================
+          Auto Backup
+      ====================================================== */}
+      {pendingBackup && (
+        <section className="panel backup-prompt">
+          <div className="panel-header">
+            <div>
+              <h2>Backup ready</h2>
+              <p>
+                Your scheduled encrypted backup is ready to be saved.
+              </p>
+            </div>
+
+            <DatabaseBackup size={18} />
+          </div>
+
+          <div className="inline-actions">
+            <button
+              className="primary-btn"
+              onClick={async () => {
+                try {
+                  const mode = await shareArchiveFile(pendingBackup);
+
+                  if (mode === 'shared') {
+                    await markAutoBackupSaved();
+                    setPendingBackup(null);
+                  }
+                } catch (error) {
+                  console.error('Could not save backup:', error);
+                }
+              }}
+            >
+              <DatabaseBackup size={16} />
+              Save backup
+            </button>
+          </div>
+
+          <p className="form-help">
+            The backup will remain available until you save it.
+          </p>
+        </section>
       )}
 
 

@@ -484,6 +484,13 @@ export async function restoreSnapshot(data: Snapshot): Promise<void> {
     }
   );
 }
+export async function markAutoBackupSaved(): Promise<void> {
+  await db.pendingBackups.delete('auto');
+
+  await db.settings.update('app', {
+    lastAutoBackupSavedAt: new Date().toISOString(),
+  });
+}
 export async function restoreLegacyJsonBackup(file: File): Promise<number> {
   const raw = JSON.parse(await file.text()) as Record<string, unknown>;
   const data = {
