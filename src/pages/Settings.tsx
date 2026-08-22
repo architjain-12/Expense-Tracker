@@ -7,7 +7,7 @@ import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
 import type { Account, AccountType, PendingBackup } from '../types/models';
 import { newId } from '../utils/id';
-import { createEncryptedArchive, createSafetyArchive, restoreEncryptedArchive, restoreLegacyJsonBackup, shareArchiveFile } from '../services/backupService';
+import { createEncryptedArchive, createSafetyArchive, restoreEncryptedArchive, calculateNextAutoBackupAt, shareArchiveFile } from '../services/backupService';
 import { resetDemoData } from '../db/seed';
 import packageJson from "../../package.json";
 
@@ -16,6 +16,7 @@ export default function Settings(){
  const [pendingBackup,setPendingBackup]=useState<PendingBackup|null>(null);
  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
  const [autoBackupDue, setAutoBackupDue] = useState(false);
+ const [nextAutoBackup, setNextAutoBackup] = useState<Date | null>(null);
  const [autoBackupIntervalHours, setAutoBackupIntervalHours] =
   useState(168);
  const [autoBackupStartTime, setAutoBackupStartTime] = useState(
@@ -33,6 +34,29 @@ export default function Settings(){
   { label: 'Every 7 days', hours: 168 },
   { label: 'Every 30 days', hours: 720 },
 ];
+useEffect(() => {
+  if (!settings?.autoBackupEnabled) {
+    setNextAutoBackup(null);
+    return;
+  }
+
+  const updateNextBackup = () => {
+    const next = calculateNextAutoBackupAt(settings);
+    setNextAutoBackup(next);
+  };
+
+  updateNextBackup();
+
+  // Refresh periodically so the displayed time stays current.
+  const interval = window.setInterval(updateNextBackup, 60 * 1000);
+
+  return () => window.clearInterval(interval);
+}, [
+  settings?.autoBackupEnabled,
+  settings?.autoBackupIntervalHours,
+  settings?.autoBackupStartTime,
+  settings?.lastAutoBackupSavedAt,
+]);
 useEffect(() => {
   if (!settings) return;
 
@@ -328,8 +352,9 @@ async function createAutoBackup() {
     <div>
       <h2>Automatic backup</h2>
       <p>
-        Create an encrypted backup when you return to the app after the
-        selected interval.
+        Create an encrypted backup when you return to the app after
+        the selected interval. The backup will wait for you to save it
+        to Files.
       </p>
     </div>
 
@@ -398,12 +423,24 @@ async function createAutoBackup() {
     )}
   </div>
 
-  {settings?.lastAutoBackupSavedAt && (
-    <p className="form-help">
-      Last backup:
-      {' '}
-      {new Date(settings.lastAutoBackupSavedAt).toLocaleString()}
-    </p>
+  {settings?.autoBackupEnabled && (
+  <div className="form-help">
+    {settings.lastAutoBackupSavedAt && (
+      <div>
+        Last backup:{' '}
+        {new Date(
+          settings.lastAutoBackupSavedAt
+        ).toLocaleString()}
+      </div>
+    )}
+
+    {nextAutoBackup && (
+      <div>
+        Next backup:{' '}
+        {nextAutoBackup.toLocaleString()}
+      </div>
+    )}
+  </div>
   )}
 
   {autoBackupDue && !pendingBackup && (
@@ -445,8 +482,12 @@ async function createAutoBackup() {
       setAutoBackupIntervalHours(autoBackupIntervalHours);
       setAutoBackupStartTime(autoBackupStartTime);
 
-      await checkAutoBackup();
+      const updatedSettings = await db.settings.get('app');
 
+      if (updatedSettings) {
+        const next = calculateNextAutoBackupAt(updatedSettings);
+        setNextAutoBackup(next);
+      }
       setMessage('Automatic backup settings saved locally.');
     }}
     >
