@@ -5,7 +5,7 @@ import { db, getActivePartition, switchPartition } from '../db/database';
 import { restoreFromGoogleSheets, syncWithGoogleSheets } from '../services/googleSheetsService';
 import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
-import type { Account, AccountType, PendingBackup } from '../types/models';
+import type { Account, AccountType, PendingBackup, Transaction } from '../types/models';
 import { newId } from '../utils/id';
 import {
   createEncryptedArchive,
