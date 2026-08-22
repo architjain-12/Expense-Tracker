@@ -668,18 +668,14 @@ export function calculateNextAutoBackupAt(
    */
   if (!settings.lastAutoBackupSavedAt) {
     const first = new Date(now);
-  
+
     first.setHours(
       hours,
       minutes,
       0,
       0
     );
-  
-    if (first.getTime() <= now.getTime()) {
-      first.setDate(first.getDate() + 1);
-    }
-  
+
     return first;
   }
 
