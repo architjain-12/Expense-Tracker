@@ -153,6 +153,7 @@ export interface AppSettings {
   lastAutoBackupGeneratedAt?: string
   autoBackupStartTime?: string; // HH:mm
   lastAutoBackupSavedAt?: string;
+  nextAutoBackupAt?: string;
 }
 
 export interface SyncQueueItem {

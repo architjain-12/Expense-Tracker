@@ -22,6 +22,9 @@ import { ensureSeedData } from "../db/seed";
 import { processDueRecurringTransactions } from "../services/recurringService";
 import { restoreFromGoogleSheetsIfEmpty } from "../services/googleSheetsService";
 import { useSettings } from "../hooks/useDb";
+import {checkAndCreateAutoBackup} from "../services/backupService";
+import packageJson from "../../package.json";
+import { db, getActivePartition } from "../db/database";
 
 function ThemeSync() {
   const settings = useSettings();
@@ -46,7 +49,14 @@ function Bootstrap() {
           console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty START");
           await restoreFromGoogleSheetsIfEmpty();
           console.log("BOOTSTRAP: restoreFromGoogleSheetsIfEmpty OK");
-  
+          await checkAndCreateAutoBackup(
+            packageJson.version,
+            getActivePartition()
+          );
+          await db.settings.update('app', {
+            lastAutoBackupSavedAt:
+              new Date().toISOString(),
+          });
           console.log("BOOTSTRAP: COMPLETE");
         } catch (error) {
           console.error("BOOTSTRAP FAILED:", error);

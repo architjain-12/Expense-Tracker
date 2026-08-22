@@ -70,16 +70,37 @@ export default function Home() {
   const recurring = useRecurringRules() ?? [];
   const [pendingBackup, setPendingBackup] = useState<File | null>(null);
   useEffect(() => {
+    let cancelled = false;
+  
     const checkPendingBackup = async () => {
       try {
-        const pending = await getPendingAutoBackup();
-        setPendingBackup(pending);
+        const pending =
+          await getPendingAutoBackup();
+  
+        if (!cancelled) {
+          setPendingBackup(pending);
+        }
       } catch (error) {
-        console.error('Could not check pending backup:', error);
+        console.error(
+          'Could not check pending backup:',
+          error
+        );
       }
     };
   
     void checkPendingBackup();
+  
+    const interval = window.setInterval(
+      () => {
+        void checkPendingBackup();
+      },
+      5000
+    );
+  
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
   }, []);
   useSettings();
 

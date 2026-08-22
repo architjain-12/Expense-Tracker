@@ -58,31 +58,7 @@ useEffect(() => {
 useEffect(() => {
   void loadPendingBackup();
 }, []);
-useEffect(() => {
-  if (!settings?.autoBackupEnabled) return;
 
-  const run = async () => {
-    const intervalHours = settings.autoBackupIntervalHours || 168;
-
-    const lastBackup = settings.lastAutoBackupSavedAt
-      ? new Date(settings.lastAutoBackupSavedAt).getTime()
-      : 0;
-
-    const due =
-      !lastBackup ||
-      Date.now() - lastBackup >= intervalHours * 60 * 60 * 1000;
-
-    if (due && !pendingBackup) {
-      await createAutoBackup();
-    }
-  };
-
-  void run();
-}, [
-  settings?.autoBackupEnabled,
-  settings?.autoBackupIntervalHours,
-  settings?.lastAutoBackupSavedAt,
-]);
  async function save(patch:Partial<NonNullable<typeof settings>>){const current=await db.settings.get('app');if(current)await db.settings.put({...current,...patch});}
  async function saveSheets(){await save({googleSheetsEndpoint:sheetUrl||settings?.googleSheetsEndpoint,googleSheetsToken:sheetToken||settings?.googleSheetsToken,googleSheetsEnabled:Boolean(sheetUrl||settings?.googleSheetsEndpoint)});setMessage('Google Sheets connection saved locally.');}
  async function sync(){const result=await syncWithGoogleSheets();setMessage(result.success?`Synced ${result.processed||0} changes.`:(result.message||'Sync failed.'));}

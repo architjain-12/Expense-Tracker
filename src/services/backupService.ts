@@ -539,3 +539,172 @@ export async function getPendingAutoBackup(): Promise<File | null> {
 export async function clearPendingAutoBackup(): Promise<void> {
   await db.pendingBackups.delete('auto');
 }
+
+export async function checkAndCreateAutoBackup(
+  applicationVersion: string,
+  partition: string
+): Promise<boolean> {
+  const settings = await db.settings.get('app');
+
+  if (!settings?.autoBackupEnabled) {
+    return false;
+  }
+
+  // Never create another backup while one is already waiting.
+  const existing = await db.pendingBackups.get('auto');
+
+  if (existing) {
+    return false;
+  }
+
+  const intervalHours =
+    settings.autoBackupIntervalHours || 168;
+
+  const intervalMs =
+    intervalHours * 60 * 60 * 1000;
+
+  const now = new Date();
+
+  const startTime =
+    settings.autoBackupStartTime || '02:00';
+
+  const [hours, minutes] =
+    startTime.split(':').map(Number);
+
+  /*
+   * Determine the most recent scheduled backup slot.
+   *
+   * The schedule is anchored to the configured start time.
+   */
+  const scheduledToday = new Date(now);
+  scheduledToday.setHours(
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  let scheduledAt: Date;
+
+  if (now >= scheduledToday) {
+    scheduledAt = scheduledToday;
+  } else {
+    scheduledAt = new Date(scheduledToday);
+    scheduledAt.setDate(
+      scheduledAt.getDate() - 1
+    );
+  }
+
+  /*
+   * If we have never successfully saved a backup,
+   * the first scheduled occurrence is the anchor.
+   */
+  if (!settings.lastAutoBackupSavedAt) {
+    if (now < scheduledAt) {
+      return false;
+    }
+  } else {
+    const lastSaved =
+      new Date(
+        settings.lastAutoBackupSavedAt
+      ).getTime();
+
+    /*
+     * Keep the existing interval-based behavior for now.
+     * This will be replaced with the final fixed-slot
+     * calculation in the next step.
+     */
+    if (now.getTime() - lastSaved < intervalMs) {
+      return false;
+    }
+  }
+
+  const manifest =
+    await createEncryptedArchive(
+      '1234567890',
+      applicationVersion,
+      partition,
+      'expense-tracker-auto-backup'
+    );
+
+  const content =
+    await manifest.archiveFile.text();
+
+  await savePendingAutoBackup(
+    manifest.archiveFile
+  );
+
+  await db.settings.update('app', {
+    lastAutoBackupGeneratedAt:
+      new Date().toISOString(),
+  });
+
+  return true;
+}
+
+export function calculateNextAutoBackupAt(
+  settings: AppSettings,
+  now = new Date()
+): Date | null {
+  if (!settings.autoBackupEnabled) {
+    return null;
+  }
+
+  const intervalHours =
+    settings.autoBackupIntervalHours || 168;
+
+  const startTime =
+    settings.autoBackupStartTime || '02:00';
+
+  const [hours, minutes] =
+    startTime.split(':').map(Number);
+
+  const intervalMs =
+    intervalHours * 60 * 60 * 1000;
+
+  /*
+   * If there has never been a saved backup,
+   * schedule from today's configured start time.
+   */
+  if (!settings.lastAutoBackupSavedAt) {
+    const first = new Date(now);
+
+    first.setHours(
+      hours,
+      minutes,
+      0,
+      0
+    );
+
+    return first;
+  }
+
+  const lastSaved =
+    new Date(
+      settings.lastAutoBackupSavedAt
+    ).getTime();
+
+  let next =
+    lastSaved + intervalMs;
+
+  /*
+   * Keep the configured start time for the
+   * scheduled clock time.
+   */
+  const candidate = new Date(next);
+
+  candidate.setHours(
+    hours,
+    minutes,
+    0,
+    0
+  );
+
+  if (candidate.getTime() <= lastSaved) {
+    candidate.setTime(
+      candidate.getTime() + intervalMs
+    );
+  }
+
+  return candidate;
+}
