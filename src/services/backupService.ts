@@ -654,7 +654,7 @@ export function calculateNextAutoBackupAt(
     settings.autoBackupIntervalHours || 168;
 
   const startTime =
-    settings.lastAutoBackupGeneratedAt || '02:00';
+    settings.autoBackupStartTime || '02:00';
 
   const [hours, minutes] =
     startTime.split(':').map(Number);
