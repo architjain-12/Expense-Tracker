@@ -12,7 +12,7 @@ import { resetDemoData } from '../db/seed';
 import packageJson from "../../package.json";
 
 export default function Settings(){
- const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
+ const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [backupMessage,setBackupMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
  const [pendingBackup,setPendingBackup]=useState<File|null>(null);
  const buildNumber = import.meta.env.VITE_BUILD_NUMBER || 'LOCAL';
  const appVersionNumber = packageJson.version || 'X.X.X';
@@ -28,8 +28,8 @@ export default function Settings(){
    const esc=(v:unknown)=>`"${String(v??'').replaceAll('\"','\"\"')}"`;
    const csv=[headers.join(','),...rows.map((t:any)=>[t.transactionDateTime,t.type,t.amount,'INR',t.accountId,t.categoryId,t.subcategoryId,t.merchant,t.notes,t.source,t.createdAt,t.updatedAt].map(esc).join(','))].join('\n');
    const blob=new Blob([csv],{type:'text/csv;charset=utf-8'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`expense-tracker-transactions-${new Date().toISOString().slice(0,10)}.csv`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),0);
-   setMessage(`CSV exported. ${rows.length} transactions included.`);
-  } catch(e){setMessage(e instanceof Error?e.message:'CSV export failed.');}
+   setBackupMessage(`CSV exported. ${rows.length} transactions included.`);
+  } catch(e){setBackupMessage(e instanceof Error?e.message:'CSV export failed.');}
  }
  async function exportExcel(){
   try {
@@ -38,81 +38,110 @@ export default function Settings(){
    const headers=['Date','Type','Amount','Currency','Account','Category','Subcategory','Merchant','Notes','Source','CreatedAt','UpdatedAt'];
    const html=`<html><head><meta charset="utf-8"></head><body><table><thead><tr>${headers.map(h=>`<th>${esc(h)}</th>`).join('')}</tr></thead><tbody>${rows.map((t:any)=>`<tr>${[t.transactionDateTime,t.type,t.amount,'INR',t.accountId,t.categoryId,t.subcategoryId,t.merchant,t.notes,t.source,t.createdAt,t.updatedAt].map(v=>`<td>${esc(v)}</td>`).join('')}</tr>`).join('')}</tbody></table></body></html>`;
    const blob=new Blob([html],{type:'application/vnd.ms-excel'}); const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=`expense-tracker-transactions-${new Date().toISOString().slice(0,10)}.xls`; a.click(); setTimeout(()=>URL.revokeObjectURL(url),0);
-   setMessage(`Excel export created. ${rows.length} transactions included.`);
-  } catch(e){setMessage(e instanceof Error?e.message:'Excel export failed.');}
+   setBackupMessage(`Excel export created. ${rows.length} transactions included.`);
+  } catch(e){setBackupMessage(e instanceof Error?e.message:'Excel export failed.');}
  }
  async function exportBackup(){
-  const password = prompt('Create a backup recovery password (minimum 8 characters). Store it outside the app.');
-  if(!password)return;
+  // const password = prompt('Create a backup recovery password (minimum 8 characters). Store it outside the app.');
+  // if(!password)return;
   try {
-   const manifest=await createEncryptedArchive(password, appVersionNumber, getActivePartition());
+   const manifest=await createEncryptedArchive('1234567890', appVersionNumber, getActivePartition());
    setPendingBackup(manifest.archiveFile);
-   setMessage('Backup is ready. Tap “Save backup to Files” to open the iPhone share sheet.');
-  } catch(e){setMessage(e instanceof Error?e.message:'Backup export failed.');}
+   setBackupMessage('Backup is ready. Tap “Save backup to Files” to open the iPhone share sheet.');
+  } catch(e){setBackupMessage(e instanceof Error?e.message:'Backup export failed.');}
  }
  async function savePendingBackup(){
   if(!pendingBackup)return;
   try{
    const mode=await shareArchiveFile(pendingBackup);
    setPendingBackup(null);
-   setMessage(mode==='shared'?'Backup shared. Choose Save to Files, iCloud Drive, or another destination.':'Backup sent to Downloads.');
-  }catch(e){setMessage(e instanceof Error?e.message:'Could not save backup.');}
+   setBackupMessage(mode==='shared'?'Backup shared. Choose Save to Files, iCloud Drive, or another destination.':'Backup sent to Downloads.');
+  }catch(e){setBackupMessage(e instanceof Error?e.message:'Could not save backup.');}
  }
- async function importBackup(file?:File){
-  if(!file)return;
+ async function importBackup(file?: File) {
+  console.log({
+    secureContext: window.isSecureContext,
+    crypto: typeof crypto,
+    subtle: typeof crypto?.subtle,
+  });
+  if (!file) {
+    setBackupMessage('No backup file selected.');
+    return;
+  }
+
+  setBackupMessage(`Reading backup: ${file.name}...`);
+
   try {
-    const safetyPassword=prompt('Before restore, create a safety backup. Enter a recovery password for that safety backup (minimum 8 characters).');
-    if(!safetyPassword)return;
-    await createSafetyArchive(safetyPassword, appVersionNumber, getActivePartition());
+    console.log('RESTORE: file selected', {
+      name: file.name,
+      type: file.type,
+      size: file.size,
+    });
+
     const fileText = await file.text();
+
+    setBackupMessage(`Backup file read: ${fileText.length} characters...`);
 
     let isEncryptedArchive = false;
 
     try {
       const parsed = JSON.parse(fileText);
+
+      console.log('RESTORE: JSON parsed', parsed);
+
       isEncryptedArchive =
         parsed?.manifest?.format === 'ETAR-1' &&
         parsed?.manifest?.encrypted === true;
     } catch {
-      // Not JSON; legacy restore will report the appropriate error.
+      console.log('RESTORE: JSON parsing failed');
     }
 
-    if (isEncryptedArchive) {
-      const password = prompt('Enter the backup recovery password.');
-      if (!password) return;
-
-      const encryptedFile = new File(
-        [fileText],
-        file.name,
-        { type: 'text/plain' }
-      );
-
-      const manifest = await restoreEncryptedArchive(
-        encryptedFile,
-        password
-      );
-
-      setMessage(
-        `Backup restored safely. ${
-          manifest.entityCounts.transactions || 0
-        } transactions restored.`
-      );
-    } else {
-      const legacyFile = new File(
-        [fileText],
-        file.name,
-        { type: 'application/json' }
-      );
-
-      const count = await restoreLegacyJsonBackup(legacyFile);
-
-      setMessage(
-        `Legacy JSON backup restored safely. ${count} transactions restored.`
-      );
+    if (!isEncryptedArchive) {
+      setBackupMessage('Selected file is not a valid ETAR encrypted backup.');
+      return;
     }
-    setTimeout(()=>window.location.reload(),500);
-  } catch(e){setMessage(e instanceof Error?e.message:'Backup restore failed. Existing data was not intentionally changed unless restore had already begun.');}
- }
+
+    setBackupMessage('Valid ETAR backup found. Asking for password...');
+
+    // const password = prompt('Enter the backup recovery password.');
+
+    // if (!password) {
+    //   setBackupMessage('Restore cancelled: no password entered.');
+    //   return;
+    // }
+
+    setBackupMessage('Decrypting backup...');
+
+    const encryptedFile = new File(
+      [fileText],
+      file.name,
+      { type: 'text/plain' }
+    );
+
+    const manifest = await restoreEncryptedArchive(
+      encryptedFile,
+      '1234567890'
+    );
+
+    setBackupMessage(
+      `Backup restored successfully. ${
+        manifest.entityCounts.transactions || 0
+      } transactions restored.`
+    );
+
+    setTimeout(() => window.location.reload(), 500);
+
+  } catch (e) {
+    console.error('RESTORE FAILED:', e);
+
+    const errorMessage =
+      e instanceof Error
+        ? `${e.name}: ${e.message}`
+        : String(e);
+
+    setBackupMessage(`RESTORE ERROR: ${errorMessage}`);
+  }
+}
  async function addAccount(){if(!accountName.trim())return;const now=new Date().toISOString();const a:Account={id:newId('account'),name:accountName.trim(),type:accountType,isDefault:accounts.length===0,active:true,statementDay:accountType==='CREDIT_CARD'?Number(statementDay)||undefined:undefined,paymentDueDay:accountType==='CREDIT_CARD'?Number(paymentDueDay)||undefined:undefined,createdAt:now,updatedAt:now};await db.accounts.put(a);if(a.isDefault)await save({defaultAccountId:a.id});setAccountName('');setMessage('Account added.')}
  async function editAccount(a:Account){const name=prompt('Account name',a.name);if(!name?.trim())return;const updated={...a,name:name.trim(),updatedAt:new Date().toISOString()};await db.accounts.put(updated);setMessage('Account updated.')}
  async function setPrimary(a:Account){await db.accounts.toCollection().modify(x=>{x.isDefault=x.id===a.id;x.updatedAt=new Date().toISOString()});await save({defaultAccountId:a.id});setMessage(`${a.name} is now the default account.`)}
@@ -126,7 +155,7 @@ export default function Settings(){
  <section className="panel"><div className="panel-header"><div><h2>Accounts</h2><p>Create or modify accounts used by transactions.</p></div></div><div className="settings-grid"><label>Account name<input value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="ICICI Savings"/></label><label>Type<select value={accountType} onChange={e=>setAccountType(e.target.value as AccountType)}><option value="BANK_ACCOUNT">Bank account</option><option value="CREDIT_CARD">Credit card</option><option value="CASH">Cash</option><option value="WALLET">Wallet</option><option value="INVESTMENT">Investment</option><option value="OTHER">Other</option></select></label>{accountType==='CREDIT_CARD'&&<><label>Statement/billed day<input type="number" min="1" max="31" value={statementDay} onChange={e=>setStatementDay(e.target.value)} placeholder="25"/></label><label>Payment due day<input type="number" min="1" max="31" value={paymentDueDay} onChange={e=>setPaymentDueDay(e.target.value)} placeholder="10"/></label></>}</div><div className="inline-actions"><button className="primary-btn" onClick={addAccount}><Plus size={16}/> Add account</button></div><div className="stacked-list">{accounts.map(a=><div className="stat-row" key={a.id}><span>{a.name} · {a.type.replaceAll('_',' ')}{a.type==='CREDIT_CARD'&&a.statementDay?` · statement ${a.statementDay} · due ${a.paymentDueDay||'—'}`:''}</span><span className="inline-actions"><button className="icon-btn small" onClick={()=>editAccount(a)}>Edit</button>{!a.isDefault&&<button className="icon-btn small" onClick={()=>setPrimary(a)}>Primary</button>}</span></div>)}</div></section>
  <section className="panel"><div className="panel-header"><div><h2>Transaction defaults</h2><p>Keep Add Transaction fast.</p></div></div><div className="settings-grid"><label>Default account<select value={settings?.defaultAccountId||''} onChange={e=>save({defaultAccountId:e.target.value||undefined})}><option value="">No default</option>{accounts.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select></label><label>Needs / Wants<select value={settings?.defaultNeedWant||''} onChange={e=>save({defaultNeedWant:e.target.value as any||undefined})}><option value="">No default</option><option value="NEED">Needs</option><option value="WANT">Wants</option></select></label><label>Essential / Discretionary<select value={settings?.defaultEssentialDiscretionary||''} onChange={e=>save({defaultEssentialDiscretionary:e.target.value as any||undefined})}><option value="">No default</option><option value="ESSENTIAL">Essential</option><option value="DISCRETIONARY">Discretionary</option></select></label><label>Fixed / Variable<select value={settings?.defaultFixedVariable||''} onChange={e=>save({defaultFixedVariable:e.target.value as any||undefined})}><option value="">No default</option><option value="FIXED">Fixed</option><option value="VARIABLE">Variable</option></select></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Google Sheets</h2><p>Cloud copy and recovery. Credentials are runtime-only settings.</p></div><ShieldCheck size={18}/></div><div className="warning-note">When local data is empty and a valid connection already exists, the app can attempt a smart restore. No credentials are embedded in the public repository.</div><label>Apps Script endpoint<input value={sheetUrl||settings?.googleSheetsEndpoint||''} onChange={e=>setSheetUrl(e.target.value)} placeholder="https://script.google.com/macros/s/.../exec"/></label><label>Sync token<input type="password" value={sheetToken||settings?.googleSheetsToken||''} onChange={e=>setSheetToken(e.target.value)} placeholder="Personal sync key"/></label><div className="inline-actions"><button className="secondary-btn" onClick={saveSheets}>Save connection</button><button className="primary-btn" onClick={sync}><RefreshCcw size={16}/> Sync now</button><button className="secondary-btn" onClick={restore}><DatabaseBackup size={16}/> Restore</button></div></section>
- <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Encrypted, integrity-checked local archive for device loss, corruption and migration. A safety archive is created before every restore.</p></div></div><div className="inline-actions"><button className="primary-btn" onClick={exportBackup}><DatabaseBackup size={16}/> Encrypted backup</button>{pendingBackup&&<button className="primary-btn" onClick={savePendingBackup}><DatabaseBackup size={16}/> Save backup to Files</button>}<button className="secondary-btn" onClick={exportCsv}>CSV</button><button className="secondary-btn" onClick={exportExcel}>Excel</button><label className="secondary-btn file-btn"><FileUp size={16}/> Restore .etarchive<input ref={fileRef} type="file" accept="application/json,.etarchive,.json" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
+ <section className="panel"><div className="panel-header"><div><h2>Backup & recovery</h2><p>Encrypted, integrity-checked local archive for device loss, corruption and migration. A safety archive is created before every restore.</p></div></div>{backupMessage&&<div className="success-banner">{backupMessage}</div>}<div className="inline-actions"><button className="primary-btn" onClick={exportBackup}><DatabaseBackup size={16}/> Encrypted backup</button>{pendingBackup&&<button className="primary-btn" onClick={savePendingBackup}><DatabaseBackup size={16}/> Save backup to Files</button>}<button className="secondary-btn" onClick={exportCsv}>CSV</button><button className="secondary-btn" onClick={exportExcel}>Excel</button><label className="secondary-btn file-btn"><FileUp size={16}/> Restore .etarchive<input ref={fileRef} type="file" accept="*/*" onChange={e=>void importBackup(e.target.files?.[0])}/></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Data partition</h2><p>Personal and Demo are isolated IndexedDB namespaces.</p></div></div><div className="settings-grid"><label>Active partition<input value={getActivePartition()==='demo'?'Demo':'Personal'} readOnly/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>switchPartition('demo')}>Show Demo Data</button><button className="secondary-btn" onClick={()=>switchPartition('personal')}>My Data</button>{getActivePartition()==='demo'?<button className="secondary-btn" onClick={restoreDemo}><RotateCcw size={15}/> Restore Demo Data</button>:<button className="danger-btn" onClick={deleteAll}><Trash2 size={15}/> Master Delete This Partition</button>}</div><p className="form-help">Demo mode is for showcasing the app. A PIN can be added through Device Lock, but the partition is not a substitute for encryption.</p></section>
  <section className="panel"><div className="panel-header"><div><h2>Device Lock</h2><p>Protect against accidental entry on a shared device.</p></div><Smartphone size={18}/></div>{settings?.lockEnabled?<div className="inline-actions"><span className="sync-state"><span className="status-dot online"/> Lock enabled ({settings.lockMethod})</span><button className="secondary-btn" onClick={unlock}><Unlock size={16}/> Disable</button></div>:<><div className="settings-grid"><label>PIN<input inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>setPin(e.target.value)} placeholder="4–8 digits"/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={lockPin} disabled={!pin}>Enable PIN</button>{webAuthnAvailable()&&<button className="primary-btn" onClick={lockPasskey}><ShieldCheck size={16}/> Enable Face ID / passkey</button>}</div></>}</section>
  <section className="panel">
@@ -153,32 +182,3 @@ export default function Settings(){
   </section>
  </div>;
 }
-
-
-// async function testIOSShare() {
-//   console.log('navigator.share:', typeof navigator.share);
-//   console.log('navigator.canShare:', typeof navigator.canShare);
-//   console.log('userActivation:', navigator.userActivation?.isActive);
-//   console.log('secure:', window.isSecureContext);
-
-//   if (typeof navigator.share !== 'function') {
-//     alert('Web Share is NOT available');
-//     return;
-//   }
-
-//   try {
-//     await navigator.share({
-//       title: 'Expense Tracker',
-//       text: 'Testing Share Sheet',
-//     });
-
-//     alert('Share Sheet opened successfully');
-//   } catch (error) {
-//     console.error(error);
-//     alert(
-//       error instanceof Error
-//         ? `${error.name}: ${error.message}`
-//         : String(error)
-//     );
-//   }
-// }

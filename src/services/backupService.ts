@@ -217,26 +217,134 @@ function validateSnapshot(data: unknown): asserts data is Snapshot {
   for (const key of required) if (!Array.isArray((data as Record<string, unknown>)[key])) throw new Error(`Backup is missing or has invalid data: ${key}.`);
 }
 
-export async function restoreEncryptedArchive(file: File, password: string): Promise<ArchiveManifest> {
-  if (!password) throw new Error('Backup password is required.');
-  const envelope = JSON.parse(await file.text()) as {
+export async function restoreEncryptedArchive(
+  file: File,
+  password: string
+): Promise<ArchiveManifest> {
+  if (!password) {
+    throw new Error('Backup password is required.');
+  }
+
+  let envelope: {
     manifest?: ArchiveManifest;
-    encryption?: { algorithm: string; kdf: string; iterations: number; salt: string; iv: string };
+    encryption?: {
+      algorithm: string;
+      kdf: string;
+      iterations: number;
+      salt: string;
+      iv: string;
+    };
     ciphertext?: string;
   };
-  if (envelope.manifest?.format !== ETAR_FORMAT || envelope.manifest.schemaVersion !== ETAR_SCHEMA_VERSION) throw new Error('Unsupported or invalid Expense Tracker archive format.');
-  if (!envelope.encryption || envelope.encryption.algorithm !== 'AES-256-GCM' || envelope.encryption.kdf !== 'PBKDF2-SHA-256') throw new Error('Unsupported archive encryption parameters.');
-  const key = await deriveKey(password, base64ToBytes(envelope.encryption.salt));
-  let plaintext: string;
+
   try {
-    const clear = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: toBufferSource(base64ToBytes(envelope.encryption.iv)) }, key, toBufferSource(base64ToBytes(envelope.ciphertext || '')));
+    envelope = JSON.parse(await file.text());
+  } catch {
+    throw new Error('The selected file is not a valid Expense Tracker archive.');
+  }
+
+  if (
+    envelope.manifest?.format !== ETAR_FORMAT ||
+    envelope.manifest.schemaVersion !== ETAR_SCHEMA_VERSION
+  ) {
+    throw new Error(
+      'Unsupported or invalid Expense Tracker archive format.'
+    );
+  }
+
+  if (
+    !envelope.encryption ||
+    envelope.encryption.algorithm !== 'AES-256-GCM' ||
+    envelope.encryption.kdf !== 'PBKDF2-SHA-256'
+  ) {
+    throw new Error('Unsupported archive encryption parameters.');
+  }
+
+  if (!envelope.encryption.salt || !envelope.encryption.iv) {
+    throw new Error('Backup encryption metadata is incomplete.');
+  }
+
+  if (!envelope.ciphertext) {
+    throw new Error('Backup ciphertext is missing.');
+  }
+
+  let salt: Uint8Array;
+  let iv: Uint8Array;
+  let ciphertext: Uint8Array;
+
+  try {
+    salt = base64ToBytes(envelope.encryption.salt);
+    iv = base64ToBytes(envelope.encryption.iv);
+    ciphertext = base64ToBytes(envelope.ciphertext);
+  } catch {
+    throw new Error('Backup contains invalid encrypted data.');
+  }
+
+  if (salt.byteLength !== 16) {
+    throw new Error('Invalid backup salt.');
+  }
+
+  if (iv.byteLength !== 12) {
+    throw new Error('Invalid backup initialization vector.');
+  }
+
+  if (ciphertext.byteLength === 0) {
+    throw new Error('Backup ciphertext is empty.');
+  }
+
+  const key = await deriveKey(password, salt);
+
+  let plaintext: string;
+
+  try {
+    const clear = await crypto.subtle.decrypt(
+      {
+        name: 'AES-GCM',
+        iv: toBufferSource(iv),
+      },
+      key,
+      toBufferSource(ciphertext)
+    );
+  
     plaintext = text(clear);
-  } catch { throw new Error('Could not decrypt backup. Check the recovery password or archive integrity.'); }
+  } catch (error) {
+    console.error('AES-GCM decrypt failed:', error);
+  
+    if (error instanceof Error) {
+      throw new Error(
+        `AES-GCM decrypt failed [${error.name}]: ${error.message || 'No message'}`
+      );
+    }
+  
+    throw new Error(`AES-GCM decrypt failed: ${String(error)}`);
+  }
+
+  let data: Snapshot & {
+    archiveDataVersion?: number;
+    exportedAt?: string;
+    transactionsCsv?: string;
+  };
+
+  try {
+    data = JSON.parse(plaintext);
+  } catch {
+    throw new Error(
+      'Backup was decrypted, but its contents are not valid JSON.'
+    );
+  }
+
   const checksum = await sha256(plaintext);
-  if (checksum !== envelope.manifest.checksum) throw new Error('Backup integrity check failed. The archive may be corrupted or modified.');
-  const data = JSON.parse(plaintext) as Snapshot & { archiveDataVersion?: number; exportedAt?: string; transactionsCsv?: string };
+
+  if (checksum !== envelope.manifest.checksum) {
+    throw new Error(
+      'Backup integrity check failed. The archive may be corrupted or modified.'
+    );
+  }
+
   validateSnapshot(data);
+
   await restoreSnapshot(data);
+
   return envelope.manifest;
 }
 
