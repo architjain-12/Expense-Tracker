@@ -7,7 +7,7 @@ import {
   DatabaseBackup,
   PieChart as PieIcon,
 } from 'lucide-react';
-
+import { useAppLifecycle } from '../hooks/useAppLifecycle';
 import {
   useTransactions,
   useAccounts,
@@ -61,7 +61,7 @@ function getCurrentMonthKey() {
 
 export default function Home() {
   const navigate = useNavigate();
-
+  const lifecycle = useAppLifecycle();
   const transactions = useTransactions() ?? [];
   const accounts = useAccounts() ?? [];
   const categories = useCategories() ?? [];
@@ -752,7 +752,7 @@ export default function Home() {
       {/* =====================================================
           Auto Backup
       ====================================================== */}
-      {pendingBackup && (
+      {/* {pendingBackup && (
         <section className="panel backup-prompt">
           <div className="panel-header">
             <div>
@@ -790,7 +790,30 @@ export default function Home() {
             The backup will remain available until you save it.
           </p>
         </section>
-      )}
+      )} */}
+      {lifecycle.pendingBackup ? (
+        <div className="warning-note">
+          <strong>Backup ready to save</strong>
+          <p>
+            Your encrypted backup is waiting to be saved to Files.
+          </p>
+
+          <Link
+            to="/settings"
+            className="primary-btn"
+          >
+            Save backup
+          </Link>
+        </div>
+      ) : lifecycle.backupDue ? (
+        <div className="warning-note">
+          <strong>Backup due</strong>
+          <p>
+            Your scheduled encrypted backup is due.
+          </p>
+        </div>
+      ) : null
+      }
 
 
       {/* =====================================================

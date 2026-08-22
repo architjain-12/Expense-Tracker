@@ -10,9 +10,11 @@ import { newId } from '../utils/id';
 import { createEncryptedArchive, createSafetyArchive, restoreEncryptedArchive, calculateNextAutoBackupAt, shareArchiveFile } from '../services/backupService';
 import { resetDemoData } from '../db/seed';
 import packageJson from "../../package.json";
+import { useAppLifecycle } from '../hooks/useAppLifecycle';
 
 export default function Settings(){
  const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [backupMessage,setBackupMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
+ const lifecycle = useAppLifecycle();
  const [pendingBackup,setPendingBackup]=useState<PendingBackup|null>(null);
  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
  const [autoBackupDue, setAutoBackupDue] = useState(false);
@@ -266,39 +268,6 @@ async function loadPendingBackup() {
     console.error('Could not load pending backup:', e);
   }
 }
-async function checkAutoBackup() {
-  if (!settings?.autoBackupEnabled) {
-    setAutoBackupDue(false);
-    return;
-  }
-
-  const intervalHours = settings.autoBackupIntervalHours || 168;
-  const startTime = settings.autoBackupStartTime || '02:00';
-
-  const [hours, minutes] = startTime.split(':').map(Number);
-
-  const now = new Date();
-
-  // First backup: use today's configured start time.
-  const scheduledStart = new Date(now);
-  scheduledStart.setHours(hours, minutes, 0, 0);
-
-  // If today's start time has not happened yet,
-  // the first backup is not due yet.
-  if (!settings.lastAutoBackupSavedAt) {
-    setAutoBackupDue(now >= scheduledStart);
-    return;
-  }
-
-  const lastBackup = new Date(
-    settings.lastAutoBackupSavedAt
-  ).getTime();
-
-  const due =
-    Date.now() - lastBackup >= intervalHours * 60 * 60 * 1000;
-
-  setAutoBackupDue(due);
-}
 
 async function createAutoBackup() {
   try {
@@ -434,16 +403,16 @@ async function createAutoBackup() {
       </div>
     )}
 
-    {nextAutoBackup && (
+    {lifecycle.nextBackupAt && (
       <div>
         Next backup:{' '}
-        {nextAutoBackup.toLocaleString()}
+        {lifecycle.nextBackupAt.toLocaleString()}
       </div>
     )}
   </div>
   )}
 
-  {autoBackupDue && !pendingBackup && (
+  {lifecycle.backupDue && !pendingBackup && (
     <div className="inline-actions">
       <button
         className="primary-btn"
