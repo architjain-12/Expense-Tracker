@@ -1,8 +1,54 @@
 import { db } from '../db/database';
+import type { AppSettings } from '../types/models';
 
 export const ETAR_FORMAT = 'ETAR-1';
 export const ETAR_SCHEMA_VERSION = 1;
 const KDF_ITERATIONS = 310000;
+
+const DEVICE_SECURITY_SETTINGS = new Set([
+  'lockEnabled',
+  'lockMethod',
+  'pinHash',
+  'pinSalt',
+  'pin',
+  'passkey',
+  'passkeyCredential',
+  'credentialId',
+  'webauthnCredential',
+  'failedAttempts',
+  'lockoutUntil',
+]);
+
+const NON_PORTABLE_SETTINGS = [
+  'demoPinHash',
+  'lockEnabled',
+  'lockMethod',
+  'passkeyCredentialId',
+  'localPinHash',
+  'googleSheetsToken',
+] as const;
+
+function sanitizeSettingsForBackup(
+  settings: AppSettings[]
+): AppSettings[] {
+  return settings.map(setting => {
+    const portable: AppSettings = {
+      id: 'app',
+      currency: setting.currency,
+      defaultAccountId: setting.defaultAccountId,
+      defaultNeedWant: setting.defaultNeedWant,
+      defaultEssentialDiscretionary:
+        setting.defaultEssentialDiscretionary,
+      defaultFixedVariable: setting.defaultFixedVariable,
+      theme: setting.theme,
+      reportingYear: setting.reportingYear,
+      googleSheetsEndpoint: setting.googleSheetsEndpoint,
+      googleSheetsEnabled: setting.googleSheetsEnabled,
+    };
+
+    return portable;
+  });
+}
 
 type Snapshot = {
   transactions: unknown[];
@@ -14,7 +60,7 @@ type Snapshot = {
   investments: unknown[];
   interestDeposits: unknown[];
   syncQueue: unknown[];
-  settings: unknown[];
+  settings: AppSettings[];
 };
 
 export type ArchiveManifest = {
@@ -75,6 +121,7 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 }
 
 async function snapshot(): Promise<Snapshot> {
+  const settings = await db.settings.toArray();
   return {
     transactions: await db.transactions.toArray(),
     accounts: await db.accounts.toArray(),
@@ -84,8 +131,8 @@ async function snapshot(): Promise<Snapshot> {
     budgets: await db.budgets.toArray(),
     investments: await db.investments.toArray(),
     interestDeposits: await db.interestDeposits.toArray(),
-    syncQueue: await db.syncQueue.toArray(),
-    settings: await db.settings.toArray(),
+    syncQueue: [], //await db.syncQueue.toArray(),
+    settings: sanitizeSettingsForBackup(settings)
   };
 }
 
@@ -350,15 +397,88 @@ export async function restoreEncryptedArchive(
 
 export async function restoreSnapshot(data: Snapshot): Promise<void> {
   validateSnapshot(data);
-  await db.transaction('rw', [db.transactions, db.accounts, db.categories, db.recurringRules, db.reviewQueue, db.budgets, db.investments, db.interestDeposits, db.syncQueue, db.settings], async () => {
-    await db.transactions.clear(); await db.accounts.clear(); await db.categories.clear(); await db.recurringRules.clear();
-    await db.reviewQueue.clear(); await db.budgets.clear(); await db.investments.clear(); await db.interestDeposits.clear(); await db.syncQueue.clear(); await db.settings.clear();
-    await db.transactions.bulkPut(data.transactions as never[]); await db.accounts.bulkPut(data.accounts as never[]); await db.categories.bulkPut(data.categories as never[]);
-    await db.recurringRules.bulkPut(data.recurringRules as never[]); await db.reviewQueue.bulkPut(data.reviewQueue as never[]); await db.budgets.bulkPut(data.budgets as never[]);
-    await db.investments.bulkPut(data.investments as never[]); await db.interestDeposits.bulkPut(data.interestDeposits as never[]); await db.syncQueue.bulkPut(data.syncQueue as never[]); await db.settings.bulkPut(data.settings as never[]);
-  });
-}
 
+  await db.transaction(
+    'rw',
+    [
+      db.transactions,
+      db.accounts,
+      db.categories,
+      db.recurringRules,
+      db.reviewQueue,
+      db.budgets,
+      db.investments,
+      db.interestDeposits,
+      db.syncQueue,
+      db.settings,
+    ],
+    async () => {
+      // ----------------------------------------------------------
+      // Preserve device-local settings before clearing the DB.
+      // ----------------------------------------------------------
+
+      const currentSettings = await db.settings.get('app');
+
+      const preservedDeviceSettings: Partial<AppSettings> = {
+        demoPinHash: currentSettings?.demoPinHash,
+        lockEnabled: currentSettings?.lockEnabled,
+        lockMethod: currentSettings?.lockMethod,
+        passkeyCredentialId: currentSettings?.passkeyCredentialId,
+        localPinHash: currentSettings?.localPinHash,
+
+        // Google Sheets token is a credential.
+        googleSheetsToken: currentSettings?.googleSheetsToken,
+      };
+
+      // ----------------------------------------------------------
+      // Clear portable application data.
+      // ----------------------------------------------------------
+
+      await db.transactions.clear();
+      await db.accounts.clear();
+      await db.categories.clear();
+      await db.recurringRules.clear();
+      await db.reviewQueue.clear();
+      await db.budgets.clear();
+      await db.investments.clear();
+      await db.interestDeposits.clear();
+      await db.syncQueue.clear();
+      await db.settings.clear();
+
+      // ----------------------------------------------------------
+      // Restore portable application data.
+      // ----------------------------------------------------------
+
+      await db.transactions.bulkPut(data.transactions as never[]);
+      await db.accounts.bulkPut(data.accounts as never[]);
+      await db.categories.bulkPut(data.categories as never[]);
+      await db.recurringRules.bulkPut(
+        data.recurringRules as never[]
+      );
+      await db.reviewQueue.bulkPut(
+        data.reviewQueue as never[]
+      );
+      await db.budgets.bulkPut(data.budgets as never[]);
+      await db.investments.bulkPut(data.investments as never[]);
+      await db.interestDeposits.bulkPut(
+        data.interestDeposits as never[]
+      );
+
+      // ----------------------------------------------------------
+      // Restore portable settings + preserve local device settings.
+      // ----------------------------------------------------------
+
+      const restoredSettings = data.settings.map(setting => ({
+        ...setting,
+        ...preservedDeviceSettings,
+      }));
+
+      await db.settings.bulkPut(
+        restoredSettings as never[]
+      );
+    }
+  );
+}
 export async function restoreLegacyJsonBackup(file: File): Promise<number> {
   const raw = JSON.parse(await file.text()) as Record<string, unknown>;
   const data = {
