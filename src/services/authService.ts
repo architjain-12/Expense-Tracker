@@ -271,48 +271,9 @@ export async function enablePasskey(): Promise<void> {
 /**
  * Disable either PIN or Face ID lock.
  */
-/**
- * Disable the current device lock as an emergency recovery action.
- *
- * IMPORTANT:
- * This does NOT delete application data and does NOT delete the
- * WebAuthn credential from the device.
- *
- * This is intentionally separate from disableLock(), which will
- * later require successful authentication before disabling a lock.
- */
-export async function emergencyDisableLock(): Promise<void> {
-  const current = await db.settings.get('app');
-
-  if (!current) {
-    throw new Error(
-      'Application settings are not initialized.'
-    );
-  }
-
-  await db.settings.put({
-    ...current,
-
-    lockEnabled: false,
-
-    localPinHash: undefined,
-
-    lockMethod: undefined,
-
-    // IMPORTANT:
-    // Keep passkeyCredentialId.
-    //
-    // The credential still exists in the iPhone's platform
-    // authenticator. We will reuse/migrate it when the new
-    // application-level authentication system is implemented.
-    passkeyCredentialId: current.passkeyCredentialId
-  });
-}
-/**
- * Disable device lock.
- */
 export async function disableLock(): Promise<void> {
-  const current = await db.settings.get('app');
+  const current =
+    await db.settings.get('app');
 
   if (!current) {
     return;
@@ -320,9 +281,13 @@ export async function disableLock(): Promise<void> {
 
   await db.settings.put({
     ...current,
+
     lockEnabled: false,
+
     localPinHash: undefined,
+
     passkeyCredentialId: undefined,
-    lockMethod: undefined,
+
+    lockMethod: undefined
   });
 }

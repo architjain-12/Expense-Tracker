@@ -7,7 +7,6 @@ import { useAccounts, useSettings } from '../hooks/useDb';
 import { disableLock, enablePasskey, setLocalPin, webAuthnAvailable } from '../services/authService';
 import type { Account, AccountType, PendingBackup, Transaction } from '../types/models';
 import { newId } from '../utils/id';
-import { CHANGELOG } from '../data/changelog';
 import {
   createEncryptedArchive,
   createSafetyArchive,
@@ -44,10 +43,6 @@ export default function Settings(){
  const buildNumber = import.meta.env.VITE_BUILD_NUMBER || 'LOCAL';
  const appVersionNumber = packageJson.version || 'X.X.X';
  const commitSha = import.meta.env.VITE_COMMIT_SHA || 'dev';
- const currentChangelog =
-  CHANGELOG.find(
-    entry => entry.version === appVersionNumber
-  );
  const AUTO_BACKUP_OPTIONS = [
   { label: 'Every 5 minutes · Testing', hours: 5 / 60 },
   { label: 'Every 2 hours', hours: 2 },
@@ -1118,32 +1113,9 @@ async function createAutoBackup() {
       Designed & Developed by A J · React · IndexedDB · Google Sheets · Local-first architecture
     </div>
  
-    <details className="build-details">
-      <summary>
-        v{appVersionNumber} · Build #{buildNumber} ·{' '}
-        {commitSha.substring(0, 7)}
-      </summary>
-
-      {currentChangelog ? (
-        <div className="build-description">
-          <strong>
-            {currentChangelog.description}
-          </strong>
-
-          <ul>
-            {currentChangelog.changes.map(
-              (change, index) => (
-                <li key={index}>{change}</li>
-              )
-            )}
-          </ul>
-        </div>
-      ) : (
-        <div className="build-description">
-          No changelog available for this version.
-        </div>
-      )}
-    </details>
+    <div className="empty-inline">
+      Build #{buildNumber} · {commitSha.substring(0, 7)}
+    </div>
   </section>
   {showRestoreOptions &&
   restoreManifest &&
