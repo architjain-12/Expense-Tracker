@@ -148,6 +148,20 @@ export interface AppSettings {
   lockMethod?: 'PASSKEY' | 'PIN';
   passkeyCredentialId?: string;
   localPinHash?: string;
+  /**
+ * One-time-generated recovery secret for disabling
+ * the local device lock when Face ID/passkey/PIN
+ * cannot be used.
+ *
+ * The plaintext recovery code is NEVER stored.
+ */
+  recoveryCodeHash?: string;
+
+  /**
+   * Timestamp indicating when the current recovery
+   * code was generated.
+   */
+  recoveryCodeCreatedAt?: string;
   autoBackupEnabled?: boolean;
   autoBackupIntervalHours?: number;
   lastAutoBackupGeneratedAt?: string

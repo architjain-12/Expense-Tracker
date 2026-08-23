@@ -16,11 +16,17 @@ import {
   savePendingRestore,
   clearPendingRestore,
 } from '../services/backupService';
+import {
+  generateRecoveryCode
+} from '../services/authService';
 import { resetDemoData } from '../db/seed';
 import packageJson from "../../package.json";
 
 export default function Settings(){
  const settings=useSettings();const accounts=useAccounts();const fileRef=useRef<HTMLInputElement>(null);const [message,setMessage]=useState('');const [backupMessage,setBackupMessage]=useState('');const [pin,setPin]=useState('');const [sheetUrl,setSheetUrl]=useState('');const [sheetToken,setSheetToken]=useState('');const [accountName,setAccountName]=useState('');const [accountType,setAccountType]=useState<AccountType>('BANK_ACCOUNT');const [statementDay,setStatementDay]=useState('');const [paymentDueDay,setPaymentDueDay]=useState('');
+ const [recoveryCode,setRecoveryCode]=useState('');
+ const [recoveryCodeVisible,setRecoveryCodeVisible]=useState(false);
+ const [recoveryCodeBusy,setRecoveryCodeBusy]=useState(false);
  const [pendingBackup,setPendingBackup]=useState<PendingBackup|null>(null);
  const [autoBackupEnabled, setAutoBackupEnabled] = useState(false);
  const [autoBackupDue, setAutoBackupDue] = useState(false);
@@ -921,7 +927,95 @@ async function createAutoBackup() {
  async function restoreDemo(){if(getActivePartition()!=='demo')return; if(!confirm('Restore the original Demo dataset? All changes made inside Demo will be replaced.'))return; try{await resetDemoData();setMessage('Demo data restored to the original dataset.');setTimeout(()=>window.location.reload(),300);}catch(e){setMessage(e instanceof Error?e.message:'Could not restore demo data.');}}
  async function lockPasskey(){try{await enablePasskey();setMessage('Device passkey lock enabled.');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable passkey lock.');}}
  async function lockPin(){try{await setLocalPin(pin);setPin('');setMessage('PIN lock enabled.');}catch(e){setMessage(e instanceof Error?e.message:'Could not enable PIN lock.');}}
- async function unlock(){await disableLock();setMessage('Device lock disabled.');}
+ async function unlock() {
+  const method = settings?.lockMethod;
+
+  if (!method) {
+    setMessage('Device lock is not enabled.');
+    return;
+  }
+
+  try {
+    if (method === 'PIN') {
+      const enteredPin = prompt(
+        'Enter your PIN to disable device lock.'
+      );
+
+      if (!enteredPin) {
+        return;
+      }
+
+      const success = await disableLock({
+        type: 'PIN',
+        value: enteredPin,
+      });
+
+      if (!success) {
+        setMessage(
+          'Incorrect PIN. Device lock remains enabled.'
+        );
+        return;
+      }
+
+      setMessage('Device lock disabled.');
+      return;
+    }
+
+    if (method === 'PASSKEY') {
+      const success = await disableLock({
+        type: 'PASSKEY',
+      });
+
+      if (!success) {
+        setMessage(
+          'Passkey authentication failed. Device lock remains enabled.'
+        );
+        return;
+      }
+
+      setMessage('Device lock disabled.');
+    }
+  } catch (e) {
+    setMessage(
+      e instanceof Error
+        ? e.message
+        : 'Could not disable device lock.'
+    );
+  }
+}
+ async function generateNewRecoveryCode() {
+  if (recoveryCodeBusy) return;
+
+  const confirmed = confirm(
+    'Generate a new recovery code?\n\n' +
+    'Any previously generated recovery code will no longer be valid.'
+  );
+
+  if (!confirmed) return;
+
+  try {
+    setRecoveryCodeBusy(true);
+    setRecoveryCodeVisible(false);
+    setRecoveryCode('');
+
+    const code = await generateRecoveryCode();
+
+    setRecoveryCode(code);
+    setRecoveryCodeVisible(true);
+
+    setMessage(
+      'New recovery code generated. Save it somewhere safe.'
+    );
+  } catch (e) {
+    setMessage(
+      e instanceof Error
+        ? e.message
+        : 'Could not generate recovery code.'
+    );
+  } finally {
+    setRecoveryCodeBusy(false);
+  }
+}
  return <div className="page-stack"><section className="hero-row"><div><Link to="/options" className="text-link">← Options</Link><span className="eyebrow">Options</span><h1>Settings</h1><p className="muted">Defaults, reporting, accounts, recovery, partitions and device lock.</p></div></section>{message&&<div className="success-banner">{message}</div>}
  <section className="panel"><div className="panel-header"><div><h2>Appearance & reporting</h2><p>Choose light/dark mode and your definition of a reporting year.</p></div></div><div className="settings-grid"><label>Theme<select value={settings?.theme||'dark'} onChange={e=>save({theme:e.target.value as any})}><option value="dark">Dark</option><option value="light">Light</option><option value="system">System</option></select></label><label>Year reporting<select value={settings?.reportingYear||'FY'} onChange={e=>save({reportingYear:e.target.value as any})}><option value="FY">Indian FY · Apr–Mar</option><option value="CALENDAR">Calendar year · Jan–Dec</option></select></label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Accounts</h2><p>Create or modify accounts used by transactions.</p></div></div><div className="settings-grid"><label>Account name<input value={accountName} onChange={e=>setAccountName(e.target.value)} placeholder="ICICI Savings"/></label><label>Type<select value={accountType} onChange={e=>setAccountType(e.target.value as AccountType)}><option value="BANK_ACCOUNT">Bank account</option><option value="CREDIT_CARD">Credit card</option><option value="CASH">Cash</option><option value="WALLET">Wallet</option><option value="INVESTMENT">Investment</option><option value="OTHER">Other</option></select></label>{accountType==='CREDIT_CARD'&&<><label>Statement/billed day<input type="number" min="1" max="31" value={statementDay} onChange={e=>setStatementDay(e.target.value)} placeholder="25"/></label><label>Payment due day<input type="number" min="1" max="31" value={paymentDueDay} onChange={e=>setPaymentDueDay(e.target.value)} placeholder="10"/></label></>}</div><div className="inline-actions"><button className="primary-btn" onClick={addAccount}><Plus size={16}/> Add account</button></div><div className="stacked-list">{accounts.map(a=><div className="stat-row" key={a.id}><span>{a.name} · {a.type.replaceAll('_',' ')}{a.type==='CREDIT_CARD'&&a.statementDay?` · statement ${a.statementDay} · due ${a.paymentDueDay||'—'}`:''}</span><span className="inline-actions"><button className="icon-btn small" onClick={()=>editAccount(a)}>Edit</button>{!a.isDefault&&<button className="icon-btn small" onClick={()=>setPrimary(a)}>Primary</button>}</span></div>)}</div></section>
@@ -1099,11 +1193,156 @@ async function createAutoBackup() {
   />
 </label></div></section>
  <section className="panel"><div className="panel-header"><div><h2>Data partition</h2><p>Personal and Demo are isolated IndexedDB namespaces.</p></div></div><div className="settings-grid"><label>Active partition<input value={getActivePartition()==='demo'?'Demo':'Personal'} readOnly/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={()=>switchPartition('demo')}>Show Demo Data</button><button className="secondary-btn" onClick={()=>switchPartition('personal')}>My Data</button>{getActivePartition()==='demo'?<button className="secondary-btn" onClick={restoreDemo}><RotateCcw size={15}/> Restore Demo Data</button>:<button className="danger-btn" onClick={deleteAll}><Trash2 size={15}/> Master Delete This Partition</button>}</div><p className="form-help">Demo mode is for showcasing the app. A PIN can be added through Device Lock, but the partition is not a substitute for encryption.</p></section>
- <section className="panel"><div className="panel-header"><div><h2>Device Lock</h2><p>Protect against accidental entry on a shared device.</p></div><Smartphone size={18}/></div>{settings?.lockEnabled?<div className="inline-actions"><span className="sync-state"><span className="status-dot online"/> Lock enabled ({settings.lockMethod})</span><button className="secondary-btn" onClick={unlock}><Unlock size={16}/> Disable</button></div>:<><div className="settings-grid"><label>PIN<input inputMode="numeric" type="password" maxLength={8} value={pin} onChange={e=>setPin(e.target.value)} placeholder="4–8 digits"/></label></div><div className="inline-actions"><button className="secondary-btn" onClick={lockPin} disabled={!pin}>Enable PIN</button>{webAuthnAvailable()&&<button className="primary-btn" onClick={lockPasskey}><ShieldCheck size={16}/> Enable Face ID / passkey</button>}</div></>}</section>
  <section className="panel">
   <div className="panel-header">
     <div>
-      <h2>About</h2> <p> v{appVersionNumber}</p>
+      <h2>Device Lock</h2>
+      <p>
+        Protect against accidental entry on a shared device.
+      </p>
+    </div>
+
+    <Smartphone size={18} />
+  </div>
+
+  {settings?.lockEnabled ? (
+    <>
+      <div className="inline-actions">
+        <span className="sync-state">
+          <span className="status-dot online" />
+          Lock enabled ({settings.lockMethod})
+        </span>
+
+        <button
+          className="secondary-btn"
+          onClick={unlock}
+        >
+          <Unlock size={16} />
+          Disable
+        </button>
+      </div>
+
+      <div className="warning-note">
+        Keep your recovery code somewhere safe. It can be used
+        to regain access if your device passkey or PIN becomes
+        unavailable.
+      </div>
+
+      <div className="panel-header" style={{ marginTop: '1.25rem' }}>
+        <div>
+          <h3>Recovery code</h3>
+          <p>
+            Generate a new one-time recovery code for this device.
+            Generating a new code invalidates the previous code.
+          </p>
+        </div>
+      </div>
+
+      <div className="inline-actions">
+        <button
+          className="secondary-btn"
+          onClick={() => void generateNewRecoveryCode()}
+          disabled={recoveryCodeBusy}
+        >
+          <ShieldCheck size={16} />
+          {recoveryCodeBusy
+            ? 'Generating...'
+            : 'Generate new recovery code'}
+        </button>
+      </div>
+
+      {recoveryCodeVisible && recoveryCode && (
+        <div className="recovery-code-box">
+          <div className="form-help">
+            Save this recovery code somewhere outside the app.
+          </div>
+
+          <div className="recovery-code-value">
+            {recoveryCode}
+          </div>
+
+          <div className="inline-actions">
+            <button
+              className="secondary-btn"
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(
+                    recoveryCode
+                  );
+
+                  setMessage(
+                    'Recovery code copied to clipboard.'
+                  );
+                } catch {
+                  setMessage(
+                    'Could not copy recovery code. Please copy it manually.'
+                  );
+                }
+              }}
+            >
+              Copy code
+            </button>
+
+            <button
+              className="secondary-btn"
+              onClick={() => {
+                setRecoveryCodeVisible(false);
+                setRecoveryCode('');
+              }}
+            >
+              Hide code
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  ) : (
+    <>
+      <div className="settings-grid">
+        <label>
+          PIN
+          <input
+            inputMode="numeric"
+            type="password"
+            maxLength={8}
+            value={pin}
+            onChange={e => setPin(e.target.value)}
+            placeholder="4–8 digits"
+          />
+        </label>
+      </div>
+
+      <div className="inline-actions">
+        <button
+          className="secondary-btn"
+          onClick={lockPin}
+          disabled={!pin}
+        >
+          Enable PIN
+        </button>
+
+        {webAuthnAvailable() && (
+          <button
+            className="primary-btn"
+            onClick={lockPasskey}
+          >
+            <ShieldCheck size={16} />
+            Enable Face ID / passkey
+          </button>
+        )}
+      </div>
+
+      <div className="form-help">
+        After enabling a device lock, you can generate a
+        recovery code from this section.
+      </div>
+    </>
+  )}
+</section>
+ <section className="panel">
+  <div className="panel-header">
+    <div>
+      <h2>About</h2>
     </div>
   </div>
 
@@ -1116,12 +1355,13 @@ async function createAutoBackup() {
 
   <div className="empty-inline trace-credit">
       Designed & Developed by A J · React · IndexedDB · Google Sheets · Local-first architecture
+      <p>v{appVersionNumber} · Build #{buildNumber} ·{' '}
+        {commitSha.substring(0, 7)}</p> 
     </div>
  
     <details className="build-details">
       <summary>
-        v{appVersionNumber} · Build #{buildNumber} ·{' '}
-        {commitSha.substring(0, 7)}
+        Changelog
       </summary>
 
       {currentChangelog ? (

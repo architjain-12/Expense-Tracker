@@ -1,4 +1,4 @@
-# Expense Tracker PWA — v2.4.1
+<!-- # Expense Tracker PWA — v2.4.1
 
 A dark/light, mobile-first, local-first personal expense tracker designed primarily for iPhone Safari/Chrome and responsive desktop use.
 
@@ -778,4 +778,254 @@ Spring Boot REST repository
 PostgreSQL / Cloud SQL / other hosted DB
 ```
 
-IndexedDB data can be exported as JSON and migrated later. Google Sheets can also serve as an interim portable reporting/backup layer.
+IndexedDB data can be exported as JSON and migrated later. Google Sheets can also serve as an interim portable reporting/backup layer. -->
+
+# TRACE — Expense Tracker PWA
+
+TRACE is a mobile-first, local-first personal expense tracker designed primarily for iPhone Safari/Chrome and responsive desktop use.
+
+The application is designed around a simple principle:
+
+> **Your financial data should remain under your control.**
+
+TRACE stores normal application data locally and does not require a continuously running server or hosted database for everyday use.
+
+---
+
+## Current Version
+
+**v2.4.2 — Phase 0**
+
+v2.4.2 introduces the first major backup and recovery foundation for TRACE.
+
+The release adds encrypted ETAR backups, restore validation, automatic-backup infrastructure, partition-aware backup/restore and protection for device-specific authentication data.
+
+The application currently supports:
+
+- Local-first expense tracking.
+- Income tracking.
+- Multiple accounts.
+- Credit-card transaction tracking.
+- Budgets.
+- Recurring payments.
+- Review Queue.
+- Investments.
+- Interest / FD / RD projections.
+- Statistics and reporting.
+- Google Sheets synchronization.
+- Personal and Demo partitions.
+- Encrypted local backups.
+- Backup restore.
+- Automatic-backup infrastructure.
+- CSV and Excel-compatible exports.
+- Local PIN/device lock.
+- WebAuthn/passkey authentication on supported devices.
+
+### v2.4.2 Recovery Status
+
+The encrypted backup system is implemented.
+
+However, the **complete device-authentication recovery mechanism is still under development**.
+
+In particular, the following remain pending:
+
+- Passkey recovery.
+- Passkey replacement after loss.
+- Verified device-lock disable flow.
+- Secure recovery when the original passkey/device is unavailable.
+- Complete device migration/recovery workflow.
+
+Therefore, the current backup system should be understood as a **data recovery mechanism**, while authentication recovery is a separate workstream still being completed.
+
+## Architecture
+
+```text
+                    TRACE React PWA
+                          │
+                          ▼
+                  Application Services
+                          │
+                          ▼
+                    Dexie / IndexedDB
+                          │
+             ┌────────────┴────────────┐
+             │                         │
+        Personal                    Demo
+        Partition                  Partition
+             │                         │
+             └────────────┬────────────┘
+                          │
+                          ▼
+                 Local financial data
+
+Optional external services:
+
+IndexedDB
+    │
+    ├── Encrypted ETAR Backup
+    │
+    └── Google Apps Script
+             │
+             ▼
+       Private Google Sheet
+
+```
+---
+
+## Financial Model
+
+TRACE deliberately separates several financial concepts:
+
+```text
+Expense ≠ Cash Outflow ≠ Estimated Due ≠ Liability
+```
+
+---
+
+## Backup & Recovery
+
+TRACE v2.4.2 introduces the **ETAR-1 encrypted archive format**.
+
+An ETAR archive contains portable application data protected by encryption and integrity validation.
+
+The backup process includes:
+
+- Encryption.
+- Random per-backup salt.
+- Random initialization vector.
+- Password-based key derivation.
+- Integrity verification.
+- Archive metadata.
+- Partition information.
+- Schema/version information.
+
+The archive can be restored only after the archive format, encryption information and data integrity have been validated.
+
+### Portable data
+
+The following types of data are intended to be portable through backup:
+
+- Transactions.
+- Accounts.
+- Categories and subcategories.
+- Recurring rules.
+- Budgets.
+- Investments.
+- Interest/FD/RD data.
+- Portable application preferences.
+- Other supported financial application data.
+
+### Device-specific data
+
+Certain information should remain associated with the device rather than being blindly copied between devices.
+
+Examples include:
+
+- Device lock state.
+- PIN-related security data.
+- Passkey/WebAuthn credentials.
+- Device authentication configuration.
+- Local authentication credentials.
+- Device-specific service credentials where applicable.
+
+This separation prevents restoring a backup on a new device from unintentionally replacing the authentication configuration of that device.
+
+### Automatic backups
+
+TRACE supports automatic-backup configuration.
+
+Because iOS PWAs cannot silently write arbitrary files into the user's Files storage, automatic backup generation and actual file saving are treated as separate operations.
+
+```text
+Backup becomes due
+       ↓
+TRACE generates backup
+       ↓
+Backup remains pending
+       ↓
+User chooses Save Backup
+       ↓
+iOS Share Sheet / Files
+
+
+---
+```
+
+# 8. README — partitions
+
+
+## Personal and Demo Data
+
+TRACE provides two logically separate data partitions:
+
+```text
+Personal
+Demo
+```
+
+---
+
+# 9. README — authentication status
+
+## Device Lock & Authentication
+
+TRACE supports local device protection using:
+
+- PIN-based device lock.
+- WebAuthn/passkey authentication.
+- Face ID/passkey authentication on supported iOS devices and browsers.
+
+This is currently a **device-local authentication system**, not a server-backed user account system.
+
+Authentication credentials are intentionally treated differently from portable financial data.
+
+### Recovery status
+
+The current implementation protects device-specific authentication data during backup restoration.
+
+The complete recovery lifecycle is still being developed.
+
+The planned recovery flow will address:
+
+- Lost passkeys.
+- Passkey replacement.
+- Device migration.
+- Secure disabling of device protection.
+- Recovery when the original authentication method is unavailable.
+
+Until this work is completed, **backup recovery and authentication recovery should not be considered the same mechanism**.
+
+```text
+v2.4.2
+│
+├── Phase 0 — IMPLEMENTED
+│   ├── ETAR-1 encrypted backup
+│   ├── Restore
+│   ├── Integrity validation
+│   ├── Automatic backup
+│   ├── Safety archive
+│   ├── Personal/Demo partition handling
+│   └── Device-specific data protection
+│
+└── Pending
+    └── Improved authentication/passkey recovery
+        ├── Verification before disable
+        ├── Passkey replacement
+        ├── Lost-passkey recovery
+        └── Device migration recovery
+
+v2.4.1
+├── Transaction UI
+└── Recurring engine
+
+v2.4.0
+├── Home/Budget
+├── Stats
+├── Recurring
+├── Accounts
+├── Investments
+└── Demo
+
+v2.3
+└── Major baseline feature set
+```
