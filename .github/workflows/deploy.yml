@@ -1,11 +1,12 @@
 name: Deploy to GitHub Pages
 
 on:
-  #push:
-    #branches:
-     # - main
-
   workflow_dispatch:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to deploy (leave blank for latest)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -21,10 +22,14 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VITE_BUILD_NUMBER: ${{ github.run_number }}
-      VITE_COMMIT_SHA: ${{ github.sha }}
+      # This dynamically captures either your manual input or falls back to the current event SHA
+      VITE_COMMIT_SHA: ${{ inputs.commit_sha != '' && inputs.commit_sha || github.sha }}
     steps:
-      - name: Checkout main branch
+      - name: Checkout specific commit
         uses: actions/checkout@v4
+        with:
+          # If you provided a manual SHA, it checks that out. Otherwise, it defaults to the latest.
+          ref: ${{ inputs.commit_sha != '' && inputs.commit_sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
