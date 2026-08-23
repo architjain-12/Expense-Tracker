@@ -13,7 +13,8 @@ import { useSettings } from '../hooks/useDb';
 
 import {
   hashPin,
-  verifyLocalPasskey
+  verifyLocalPasskey,
+  emergencyDisableLock
 } from '../services/authService';
 
 interface AppLockGuardProps {
@@ -68,6 +69,12 @@ export default function AppLockGuard({
       settings.passkeyCredentialId
     ).then(ok => {
       setUnlocked(ok);
+
+      if (!ok) {
+        setError(
+          'Face ID verification was not completed. You can try again or use Recovery.'
+        );
+      }
     });
   }, [
     settings?.lockEnabled,
@@ -145,9 +152,46 @@ export default function AppLockGuard({
 
     if (ok) {
       setUnlocked(true);
+      setError('');
     } else {
       setError(
-        'Face ID verification was not completed.'
+        'Face ID verification was not completed. You can try again or use Recovery.'
+      );
+    }
+  }
+
+  async function recoverAccess() {
+    setError('');
+
+    const confirmed = window.confirm(
+      'Emergency recovery will disable the current device lock for this partition. Your financial data will not be deleted. Continue?'
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      await emergencyDisableLock();
+
+      /*
+       * Unlock immediately for this session.
+       *
+       * The settings record has also been updated, so
+       * the lock will remain disabled after reload.
+       */
+      setUnlocked(true);
+
+    } catch (error) {
+      console.error(
+        'EMERGENCY RECOVERY FAILED:',
+        error
+      );
+
+      setError(
+        error instanceof Error
+          ? error.message
+          : 'Emergency recovery failed.'
       );
     }
   }
@@ -222,6 +266,26 @@ export default function AppLockGuard({
             {error}
           </div>
         )}
+
+        <div className="lock-recovery">
+          <button
+            type="button"
+            className="secondary-btn"
+            onClick={() =>
+              void recoverAccess()
+            }
+          >
+            Recover access
+          </button>
+
+          <p className="form-help">
+            Can't use Face ID or your passkey?
+            Use emergency recovery to disable
+            the device lock for this partition.
+            Your financial data will not be
+            deleted.
+          </p>
+        </div>
 
         <p className="form-help">
           This is a local device lock.
