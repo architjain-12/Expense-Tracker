@@ -6,8 +6,7 @@ import {
 
 import {
   LockKeyhole,
-  ShieldCheck,
-  ArrowLeft
+  ShieldCheck
 } from 'lucide-react';
 
 import { useSettings } from '../hooks/useDb';
@@ -33,12 +32,6 @@ export default function AppLockGuard({
   const [pin, setPin] =
     useState('');
 
-  const [recoveryCode, setRecoveryCode] =
-    useState('');
-
-  const [showRecovery, setShowRecovery] =
-    useState(false);
-
   const [error, setError] =
     useState('');
 
@@ -59,6 +52,8 @@ export default function AppLockGuard({
   /*
    * If Face ID/passkey is configured,
    * immediately ask the browser to authenticate.
+   *
+   * On supported iPhones this can display Face ID.
    */
   useEffect(() => {
     if (
@@ -168,35 +163,24 @@ export default function AppLockGuard({
   async function recoverAccess() {
     setError('');
 
-    const normalizedCode =
-      recoveryCode
-        .replace(/[\s-]/g, '')
-        .toUpperCase();
+    const confirmed = window.confirm(
+      'Emergency recovery will disable the current device lock for this partition. Your financial data will not be deleted. Continue?'
+    );
 
-    if (normalizedCode.length !== 16) {
-      setError(
-        'Enter the complete 16-character recovery code.'
-      );
-
+    if (!confirmed) {
       return;
     }
 
     try {
-      await emergencyDisableLock(
-        normalizedCode
-      );
+      await emergencyDisableLock();
 
       /*
        * Unlock immediately for this session.
        *
-       * emergencyDisableLock() has already
-       * persisted lockEnabled=false in the
-       * active partition.
+       * The settings record has also been updated, so
+       * the lock will remain disabled after reload.
        */
       setUnlocked(true);
-      setRecoveryCode('');
-      setShowRecovery(false);
-      setError('');
 
     } catch (error) {
       console.error(
@@ -210,99 +194,6 @@ export default function AppLockGuard({
           : 'Emergency recovery failed.'
       );
     }
-  }
-
-  if (showRecovery) {
-    return (
-      <div className="lock-screen">
-        <div className="lock-card">
-
-          <div className="lock-mark">
-            <ShieldCheck size={28} />
-          </div>
-
-          <span className="eyebrow">
-            Emergency recovery
-          </span>
-
-          <h1>
-            Recover access
-          </h1>
-
-          <p className="muted">
-            Enter the recovery code you saved
-            when device lock was configured.
-          </p>
-
-          <input
-            className="pin-input"
-            inputMode="text"
-            type="text"
-            autoComplete="off"
-            autoCapitalize="characters"
-            spellCheck={false}
-            maxLength={19}
-            value={recoveryCode}
-            onChange={event => {
-              const value =
-                event.target.value
-                  .replace(/[^a-zA-Z0-9]/g, '')
-                  .toUpperCase()
-                  .slice(0, 16);
-
-              const formatted =
-                value.match(/.{1,4}/g)
-                  ?.join('-') ?? value;
-
-              setRecoveryCode(formatted);
-              setError('');
-            }}
-            onKeyDown={event => {
-              if (event.key === 'Enter') {
-                void recoverAccess();
-              }
-            }}
-            placeholder="XXXX-XXXX-XXXX-XXXX"
-          />
-
-          <button
-            type="button"
-            className="primary-btn lock-action"
-            onClick={() =>
-              void recoverAccess()
-            }
-          >
-            Recover access
-          </button>
-
-          {error && (
-            <div className="form-error">
-              {error}
-            </div>
-          )}
-
-          <button
-            type="button"
-            className="secondary-btn"
-            onClick={() => {
-              setShowRecovery(false);
-              setRecoveryCode('');
-              setError('');
-            }}
-          >
-            <ArrowLeft size={16} />
-            Back to unlock
-          </button>
-
-          <p className="form-help">
-            Recovery disables the local device
-            lock for this partition. Your
-            financial data is not deleted.
-          </p>
-
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -336,6 +227,7 @@ export default function AppLockGuard({
             }
           >
             <ShieldCheck size={18} />
+
             Unlock with Face ID / passkey
           </button>
         ) : (
@@ -348,10 +240,7 @@ export default function AppLockGuard({
               maxLength={8}
               value={pin}
               onChange={event =>
-                setPin(
-                  event.target.value
-                    .replace(/\D/g, '')
-                )
+                setPin(event.target.value)
               }
               onKeyDown={event => {
                 if (event.key === 'Enter') {
@@ -379,24 +268,23 @@ export default function AppLockGuard({
         )}
 
         <div className="lock-recovery">
-
           <button
             type="button"
             className="secondary-btn"
-            onClick={() => {
-              setShowRecovery(true);
-              setError('');
-            }}
+            onClick={() =>
+              void recoverAccess()
+            }
           >
             Recover access
           </button>
 
           <p className="form-help">
             Can't use Face ID or your passkey?
-            Use your recovery code to disable
-            the device lock.
+            Use emergency recovery to disable
+            the device lock for this partition.
+            Your financial data will not be
+            deleted.
           </p>
-
         </div>
 
         <p className="form-help">
